@@ -36,8 +36,7 @@ typedef struct animated_gif
  * Load a GIF image from a file and return a
  * structure of type animated_gif.
  */
-animated_gif *
-load_pixels( char * filename )
+animated_gif * load_pixels( char * filename )
 {
     GifFileType * g ;
     ColorMapObject * colmap ;
@@ -100,7 +99,7 @@ load_pixels( char * filename )
                 g->SavedImages[i].ImageDesc.Height,
                 g->SavedImages[i].ImageDesc.Interlace,
                 g->SavedImages[i].ImageDesc.ColorMap
-                ) ;
+              ) ;
 #endif
     }
 
@@ -118,7 +117,7 @@ load_pixels( char * filename )
             g->SColorMap->ColorCount,
             g->SColorMap->BitsPerPixel,
             g->SColorMap->SortFlag
-            ) ;
+          ) ;
 #endif
 
     /* Allocate the array of pixels to be returned */
@@ -135,9 +134,9 @@ load_pixels( char * filename )
         p[i] = (pixel *)malloc( width[i] * height[i] * sizeof( pixel ) ) ;
         if ( p[i] == NULL )
         {
-        fprintf( stderr, "Unable to allocate %d-th array of %d pixels\n",
-                i, width[i] * height[i] ) ;
-        return NULL ;
+            fprintf( stderr, "Unable to allocate %d-th array of %d pixels\n",
+                    i, width[i] * height[i] ) ;
+            return NULL ;
         }
     }
 
@@ -195,8 +194,7 @@ load_pixels( char * filename )
     return image ;
 }
 
-int
-output_modified_read_gif( char * filename, GifFileType * g )
+int output_modified_read_gif( char * filename, GifFileType * g )
 {
     GifFileType * g2 ;
     int error2 ;
@@ -236,8 +234,7 @@ output_modified_read_gif( char * filename, GifFileType * g )
 }
 
 
-int
-store_pixels( char * filename, animated_gif * image )
+int store_pixels( char * filename, animated_gif * image )
 {
     int n_colors = 0 ;
     pixel ** p ;
@@ -269,7 +266,7 @@ store_pixels( char * filename, animated_gif * image )
             image->g->SColorMap->Colors[ image->g->SBackGroundColor ].Green
             +
             image->g->SColorMap->Colors[ image->g->SBackGroundColor ].Blue
-            )/3 ;
+          )/3 ;
     if ( moy < 0 ) moy = 0 ;
     if ( moy > 255 ) moy = 255 ;
 
@@ -573,8 +570,7 @@ store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void
-apply_gray_filter( animated_gif * image )
+void apply_gray_filter( animated_gif * image )
 {
     int i, j ;
     pixel ** p ;
@@ -615,16 +611,15 @@ void apply_gray_line( animated_gif * image )
         {
             for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
             {
-            p[i][CONV(j,k,image->width[i])].r = 0 ;
-            p[i][CONV(j,k,image->width[i])].g = 0 ;
-            p[i][CONV(j,k,image->width[i])].b = 0 ;
+                p[i][CONV(j,k,image->width[i])].r = 0 ;
+                p[i][CONV(j,k,image->width[i])].g = 0 ;
+                p[i][CONV(j,k,image->width[i])].b = 0 ;
             }
         }
     }
 }
 
-void
-apply_blur_filter( animated_gif * image, int size, int threshold )
+void apply_blur_filter( animated_gif * image, int size, int threshold )
 {
     int i, j, k ;
     int width, height ;
@@ -732,9 +727,9 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
                     if ( diff_r > threshold || -diff_r > threshold
                             ||
-                             diff_g > threshold || -diff_g > threshold
-                             ||
-                              diff_b > threshold || -diff_b > threshold
+                            diff_g > threshold || -diff_g > threshold
+                            ||
+                            diff_b > threshold || -diff_b > threshold
                        ) {
                         end = 0 ;
                     }
@@ -755,8 +750,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
 }
 
-void
-apply_sobel_filter( animated_gif * image )
+void apply_sobel_filter( animated_gif * image )
 {
     int i, j, k ;
     int width, height ;

@@ -33,3 +33,6 @@
 
 # Images are too heavy
 *.gif
+
+# executable
+sobelf

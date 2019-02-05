@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+    <head>
+
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="">
+        <meta name="Sonia" content="">
+
+        <!-- SyntaxHighlighter Scripts  -->
+        <script type="text/javascript" src="../common/scripts/shCore.js"></script>
+        <script type="text/javascript" src="../common/scripts/shBrushCpp.js"></script>
+        <script type="text/javascript" src="../common/scripts/shBrushBash.js"></script>
+        <link type="text/css" rel="stylesheet" href="../common/styles/shCoreDefault.css"/>
+        <script type="text/javascript">SyntaxHighlighter.all();</script>
+
+
+        <!-- Bootstrap Core CSS -->
+        <link href="../common/css/bootstrap.min.css" rel="stylesheet">
+
+        <!-- Custom CSS -->
+        <link href="../common/css/simple-sidebar.css" rel="stylesheet">
+
+        <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+            <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+        <![endif]-->
+
+        <link rev="MADE" href="mailto:patrick.carribault@cea.fr">
+
+        <!-- MathJax Configuration and Script -->
+        <script type="text/x-mathjax-config">
+            MathJax.Hub.Config({
+        extensions: ["tex2jax.js", "mml2jax.js","AMSmath.js", "AMSsymbols.js"],
+        jax: ["input/TeX", "input/MathML", "output/HTML-CSS"],
+        tex2jax: {inlineMath: [["$","$"],["\\(","\\)"]]}
+    });
+        </script>
+        <script type="text/javascript"
+                src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+        </script>
+        <link href="../common/css/bootstrap.min.css" rel="stylesheet">
+        <link href="../common/css/simple-sidebar.css" rel="stylesheet">
+        <title>INF560 - Projects</title>
+        <!-- WARNING: in <pre /> method : all < must be replaced with &lt;   -->
+  </head>
+
+<!-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% -->
+<!-- %%%%%%%%%%%%%% STENCIL %%%%%%%%%%%%%%%%%% -->
+<!-- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% -->
+<h2 id="topic1">Topic 1 - Image Filtering</h2>
+
+<p>
+This first topic covers a large spectrum of algorithms in HPC and Big Data.
+We focus here on image filtering which can be seen as a direct application of big data programs like the one performed by Google for image recognition (coupled with Deep Learning).
+Furthermore, this approach can be grouped in the domain of stencil application.
+</p>
+
+<h3>Description</h3>
+
+<p>
+This topic focuses on a specific image filter that is useful to detect objects and edges inside various images.
+This filter is called <a href="https://en.wikipedia.org/wiki/Sobel_operator">Sobel</a> and it applies on a grayscale image.
+Therefore, the first step is to transform the image from a color one to a set of gray pixels.
+For this purpose, we will work with GIF images because this format has the following advantages:
+<li>Easy to manipulate</li>
+<li>Widespread format (social networks)</li>
+<li>Allow animation (multiple images)</li>
+</p>
+Then, a blur filter is applied to a small part of the images to exclude the borders.
+Thus, the main goal of this project is to parallelize an application that apply multiple filters (grayscale, blur and Sobel) to a GIF image (either a single image or an animated GIF).
+
+
+<h3>Examples</h3>
+
+<p>
+This section presents some examples of Sobel-filter application on real images.
+The first image is very simple and shows how the filter can detect the edges by putting pixels in black if there are no differences with neighbors or in white if an edge is detected.
+
+        <center><img src="images/original/frame_002.gif" style="width:300px">
+        <img src="images/original/frame_002-sobel.gif" style="width:300px"></center>
+</p>
+
+<p>
+This second image depicts a simple flag.
+After applying the Sobel filter, only the stars and the top-left corner contain white pixels.
+        <center><img src="images/original/australian-flag-large.gif" style="width:300px">
+        <img src="images/original/australian-flag-large-sobel.gif" style="width:300px"></center>
+</p>
+
+
+<p>
+With a simple drawing and a white background, the Sobel filter is able to detect the edges as shown on the right-hand side of the following picture.
+        <center><img src="images/original/Produits_sous_linux.gif" style="width:300px">
+        <img src="images/original/Produits_sous_linux-sobel.gif" style="width:300px"></center>
+</p>
+
+
+<p>
+Finally, this project supports animated GIF by processing and applying the Sobel filter frame by frame.
+        <center><img src="images/original/TimelyHugeGnu.gif" style="width:300px">
+        <img src="images/original/TimelyHugeGnu-sobel.gif" style="width:300px"></center>
+</p>
+
+
+<h3>Source Code</h3>
+<div>
+    The source code for this project is available here: <a href="sobelf.tgz">sobelf.tgz</a>. This archive contains:
+</div>
+<ul>
+  <li><code>images/</code>: a set of images for testing the program</li>
+  <li><code>include/</code>: a few header files</li>
+  <li><code>src/</code>: the source code of the application. The file containing the filter to parallelize is <code>main.c</code>.</li>
+  <li><code>obj/</code>: directory that will contain the object files to build the project (it will be created during the compilation phase if needed).</li>
+  <li><code>Makefile</code>: type <code>make</code> to compile the code. It will create an executable binary named <code>sobelf</code> that takes 2 arguments: the input image file and an output image filename.</li>
+  <li><code>run_test.sh</code>: This script launches the executable on the images located inside the <code>images/</code> directory. The processed images are stored inside a subdirectory of <code>images/</code>.
+  <li><code>clean_test.sh</code>: This script removes the processed images from a subdirectory of <code>images/</code>.
+</ul>
+
+<h3>Parallelism Hint</h3>
+<p>
+There are multiple levels of available parallelism: during the filter process (all filters!) of one image, while processing multiple images.
+The application already prints the time spend in image reading, processing and output.
+</p>
+
+<h2 id="deadlines">Deadlines</h2>
+
+Here are the main deadlines:
+<ul>
+    <li>January 23th, 2019: Choose the topic you will cover (topics beyond the 3 choices should be approved by us) and communicate its number (and the names of work pair) by email to us</li>
+    <li>March 18th, 2019: Finalize the source code and report (upload will be available on the Moodle page)</li>
+    <li>March 20th, 2019: Defense day! (Agenda will be available later)</li>
+</ul>
+
+
+
