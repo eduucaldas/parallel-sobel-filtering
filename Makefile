@@ -39,3 +39,4 @@ sobelf:$(OBJ)
 
 clean:
 	rm -f sobelf $(OBJ)
+	rm -f images/processed/*
