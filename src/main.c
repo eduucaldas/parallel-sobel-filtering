@@ -570,19 +570,37 @@ int store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void apply_to_all( animated_gif * image, void (*filter)(pixel*, int, int) )
-{
-    int i;
-    pixel ** p ;
+// void apply_gray_line( animated_gif * image )
+// {
+//     int i, j, k ;
+//     pixel ** p ;
+//
+//     p = image->p ;
+//
+//     for ( i = 0 ; i < image->n_images ; i++ )
+//     {
+//         for ( j = 0 ; j < 10 ; j++ )
+//         {
+//             for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
+//             {
+//                 p[i][CONV(j,k,image->width[i])].r = 0 ;
+//                 p[i][CONV(j,k,image->width[i])].g = 0 ;
+//                 p[i][CONV(j,k,image->width[i])].b = 0 ;
+//             }
+//         }
+//     }
+// }
 
-    p = image->p ;
+//------------------------ END OF FILE TREATING -------------------------------
 
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        (*filter)(p[i], image->width[i], image->height[i]);
-    }
-}
+#define CONV(l,c,nb_c) \
+    (l)*(nb_c)+(c)
 
+// Configuration Variables
+int SIZE = 5;
+int THRESHOLD = 20;
+
+// Filters
 void gray_filter(pixel* p, int width, int height){
     for ( int j = 0 ; j < width * height ; j++ )
     {
@@ -596,35 +614,6 @@ void gray_filter(pixel* p, int width, int height){
         p[j].r = moy ;
         p[j].g = moy ;
         p[j].b = moy ;
-    }
-}
-
-void apply_gray_filter( animated_gif * image )
-{
-    apply_to_all(image, gray_filter);
-}
-
-#define CONV(l,c,nb_c) \
-    (l)*(nb_c)+(c)
-
-void apply_gray_line( animated_gif * image )
-{
-    int i, j, k ;
-    pixel ** p ;
-
-    p = image->p ;
-
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        for ( j = 0 ; j < 10 ; j++ )
-        {
-            for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
-            {
-                p[i][CONV(j,k,image->width[i])].r = 0 ;
-                p[i][CONV(j,k,image->width[i])].g = 0 ;
-                p[i][CONV(j,k,image->width[i])].b = 0 ;
-            }
-        }
     }
 }
 
@@ -740,147 +729,6 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
         free (new) ;
 
 }
-#define DEFAULT_SIZE 5
-#define DEFAULT_THRESHOLD 20
-
-void blur_filter_with_defaults( pixel * p, int width, int height){
-    blur_filter(p, width, height, DEFAULT_SIZE, DEFAULT_THRESHOLD);
-}
-
-void apply_blur_filter_with_defaults( animated_gif * image ){
-    apply_to_all(image, blur_filter_with_defaults);
-}
-
-void apply_blur_filter( animated_gif * image, int size, int threshold )
-{
-    int i, j, k ;
-    int width, height ;
-    int end = 0 ;
-    int n_iter = 0 ;
-
-    pixel ** p ;
-    pixel * new ;
-
-    /* Get the pixels of all images */
-    p = image->p ;
-
-
-    /* Process all images */
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        n_iter = 0 ;
-        width = image->width[i] ;
-        height = image->height[i] ;
-
-        /* Allocate array of new pixels */
-        new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
-        /* Perform at least one blur iteration */
-        do
-        {
-            end = 1 ;
-            n_iter++ ;
-
-            /* Apply blur on top part of image (10%) */
-            for(j=size; j<height/10-size; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    int stencil_j, stencil_k ;
-                    int t_r = 0 ;
-                    int t_g = 0 ;
-                    int t_b = 0 ;
-
-                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-                    {
-                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-                        {
-                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-                        }
-                    }
-
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-                }
-            }
-
-            /* Copy the middle part of the image */
-            for(j=height/10-size; j<height*0.9+size; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-                }
-            }
-
-            /* Apply blur on the bottom part of the image (10%) */
-            for(j=height*0.9+size; j<height-size; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    int stencil_j, stencil_k ;
-                    int t_r = 0 ;
-                    int t_g = 0 ;
-                    int t_b = 0 ;
-
-                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-                    {
-                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-                        {
-                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-                        }
-                    }
-
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-                }
-            }
-
-            for(j=1; j<height-1; j++)
-            {
-                for(k=1; k<width-1; k++)
-                {
-
-                    float diff_r ;
-                    float diff_g ;
-                    float diff_b ;
-
-                    diff_r = (new[CONV(j  ,k  ,width)].r - p[i][CONV(j  ,k  ,width)].r) ;
-                    diff_g = (new[CONV(j  ,k  ,width)].g - p[i][CONV(j  ,k  ,width)].g) ;
-                    diff_b = (new[CONV(j  ,k  ,width)].b - p[i][CONV(j  ,k  ,width)].b) ;
-
-                    if ( diff_r > threshold || -diff_r > threshold
-                            ||
-                            diff_g > threshold || -diff_g > threshold
-                            ||
-                            diff_b > threshold || -diff_b > threshold
-                       ) {
-                        end = 0 ;
-                    }
-
-                    p[i][CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
-                    p[i][CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
-                    p[i][CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
-                }
-            }
-
-        }
-        while ( threshold > 0 && !end ) ;
-
-        // printf( "Nb iter for image %d\n", n_iter ) ;
-
-        free (new) ;
-    }
-
-}
 
 void sobel_filter(pixel* p, int width, int height){
     pixel * sobel ;
@@ -942,6 +790,33 @@ void sobel_filter(pixel* p, int width, int height){
 
     free (sobel) ;
 
+}
+
+void blur_filter_with_defaults( pixel * p, int width, int height){
+    blur_filter(p, width, height, SIZE, THRESHOLD);
+}
+
+// Applying filters to all images of Gif
+void apply_to_all( animated_gif * image, void (*filter)(pixel*, int, int) )
+{
+    int i;
+    pixel ** p ;
+
+    p = image->p ;
+
+    for ( i = 0 ; i < image->n_images ; i++ )
+    {
+        (*filter)(p[i], image->width[i], image->height[i]);
+    }
+}
+
+void apply_gray_filter( animated_gif * image )
+{
+    apply_to_all(image, gray_filter);
+}
+
+void apply_blur_filter_with_defaults( animated_gif * image ){
+    apply_to_all(image, blur_filter_with_defaults);
 }
 
 void apply_sobel_filter( animated_gif * image )
