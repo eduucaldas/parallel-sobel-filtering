@@ -730,6 +730,45 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
 
 }
 
+void sobel_on_pixel(pixel *p, pixel *sobel, int j, int k, int width, int totalWidth) {
+    int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
+    int pixel_blue_so, pixel_blue_s, pixel_blue_se;
+    int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+
+    float deltaX_blue ;
+    float deltaY_blue ;
+    float val_blue;
+
+    pixel_blue_n  = p[CONV(j-1,k  ,totalWidth)].b ;
+    pixel_blue_ne = p[CONV(j-1,k+1,totalWidth)].b ;
+    pixel_blue_so = p[CONV(j+1,k-1,totalWidth)].b ;
+    pixel_blue_no = p[CONV(j-1,k-1,totalWidth)].b ;
+    pixel_blue_s  = p[CONV(j+1,k  ,totalWidth)].b ;
+    pixel_blue_se = p[CONV(j+1,k+1,totalWidth)].b ;
+    pixel_blue_o  = p[CONV(j  ,k-1,totalWidth)].b ;
+    pixel_blue    = p[CONV(j  ,k  ,totalWidth)].b ;
+    pixel_blue_e  = p[CONV(j  ,k+1,totalWidth)].b ;
+
+    deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;
+
+    deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
+
+    val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
+
+
+    if ( val_blue > 50 )
+    {
+        sobel[CONV(j  ,k  ,width)].g = 255 ;
+        sobel[CONV(j  ,k  ,width)].b = 255 ;
+        sobel[CONV(j  ,k  ,width)].r = 255 ;
+    } else
+    {
+        sobel[CONV(j  ,k  ,width)].r = 0 ;
+        sobel[CONV(j  ,k  ,width)].g = 0 ;
+        sobel[CONV(j  ,k  ,width)].b = 0 ;
+    }
+}
+
 void sobel_filter(pixel* p, int width, int height){
     pixel * sobel ;
 
@@ -792,6 +831,91 @@ void sobel_filter(pixel* p, int width, int height){
 
 }
 
+void sobel_filter_mini(pixel* p, int width, int height, int totalWidth){
+    pixel * sobel ;
+
+    sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
+
+    for(int j=1; j<height-1; j++) {
+        for(int k=1; k<width-1; k++) {
+            sobel_on_pixel(p, sobel, j, k, width, totalWidth);
+        }
+    }
+
+    for(int j=1; j<height-1; j++)
+    {
+        for(int k=1; k<width-1; k++)
+        {
+            p[CONV(j  ,k  ,totalWidth)].r = sobel[CONV(j  ,k  ,width)].r ;
+            p[CONV(j  ,k  ,totalWidth)].g = sobel[CONV(j  ,k  ,width)].g ;
+            p[CONV(j  ,k  ,totalWidth)].b = sobel[CONV(j  ,k  ,width)].b ;
+        }
+    }
+
+    free (sobel) ;
+
+}
+
+void distributed_sobel_filter(pixel* p, int width, int height) {
+    int m = height / 10, n = width / 10;
+
+    pixel * sobel;
+
+    sobel = (pixel*) malloc(width * height * sizeof(pixel));
+
+    // Sobel on the horizontal grid
+    for(int j = m; j < height - 1; j += m) {
+        for(int k = 1; k < width - 1; k++) {
+            sobel_on_pixel(p, sobel, j, k, width, width);
+        }
+    }
+
+    // Sobel on the vertical grid
+    for(int k = n; k < width - 1; k += n) {
+        for(int j = 1; j < height - 1; j++) {
+            sobel_on_pixel(p, sobel, j, k, width, width);
+        }
+    }
+
+    // Sobel inside the mini-blocks
+    for(int j = 0; j * m < height - 1; j++) {
+        for(int k = 0; k * n < width - 1; k++) {
+            int w, h;
+            
+            if (m * (j + 1) < height)
+                h = m + 1;
+            else
+                h = height - j * m;
+            
+            if (n * (k + 1) < width)
+                w = n + 1;
+            else
+                w = width - k * n;
+
+            sobel_filter_mini(p + j * m * width + k * n, w, h, width);
+        }
+    }
+
+    // Update grid
+    for(int j = m; j < height - 1; j += m) {
+        for(int k = 1; k < width - 1; k++) {
+            p[CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
+            p[CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
+            p[CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+        }
+    }
+
+    for(int j = 1; j < height - 1; j++) {
+        for(int k = n; k < width - 1; k += n) {
+            p[CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
+            p[CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
+            p[CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+        }
+    }
+
+    free (sobel);
+}
+
 void blur_filter_with_defaults( pixel * p, int width, int height){
     blur_filter(p, width, height, SIZE, THRESHOLD);
 }
@@ -821,7 +945,8 @@ void apply_blur_filter_with_defaults( animated_gif * image ){
 
 void apply_sobel_filter( animated_gif * image )
 {
-    apply_to_all(image, sobel_filter);
+    //apply_to_all(image, sobel_filter);
+    apply_to_all(image, distributed_sobel_filter);
 }
 
 int main( int argc, char ** argv )
