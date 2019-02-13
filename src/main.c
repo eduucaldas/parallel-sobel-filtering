@@ -618,115 +618,115 @@ void gray_filter(pixel* p, int width, int height){
 }
 
 void blur_filter(pixel * p, int width, int height, int size, int threshold){
-        int n_iter = 0 ;
-        int end = 1;
+    int n_iter = 0 ;
+    int end = 1;
 
-        /* Allocate array of new pixels */
-        pixel * new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
+    /* Allocate array of new pixels */
+    pixel * new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
 
-        /* Perform at least one blur iteration */
-        do
+    /* Perform at least one blur iteration */
+    do
+    {
+        end = 1 ;
+        n_iter++ ;
+
+        /* Apply blur on top part of image (10%) */
+        for(int j=size; j<height/10-size; j++)
         {
-            end = 1 ;
-            n_iter++ ;
-
-            /* Apply blur on top part of image (10%) */
-            for(int j=size; j<height/10-size; j++)
+            for(int k=size; k<width-size; k++)
             {
-                for(int k=size; k<width-size; k++)
-                {
-                    int stencil_j, stencil_k ;
-                    int t_r = 0 ;
-                    int t_g = 0 ;
-                    int t_b = 0 ;
+                int stencil_j, stencil_k ;
+                int t_r = 0 ;
+                int t_g = 0 ;
+                int t_b = 0 ;
 
-                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
+                for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
+                {
+                    for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
                     {
-                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-                        {
-                            t_r += p[CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[CONV(j+stencil_j,k+stencil_k,width)].b ;
-                        }
+                        t_r += p[CONV(j+stencil_j,k+stencil_k,width)].r ;
+                        t_g += p[CONV(j+stencil_j,k+stencil_k,width)].g ;
+                        t_b += p[CONV(j+stencil_j,k+stencil_k,width)].b ;
                     }
-
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
                 }
+
+                new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
+                new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
+                new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
             }
-
-            /* Copy the middle part of the image */
-            for(int j=height/10-size; j<height*0.9+size; j++)
-            {
-                for(int k=size; k<width-size; k++)
-                {
-                    new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
-                    new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
-                    new[CONV(j,k,width)].b = p[CONV(j,k,width)].b ;
-                }
-            }
-
-            /* Apply blur on the bottom part of the image (10%) */
-            for(int j=height*0.9+size; j<height-size; j++)
-            {
-                for(int k=size; k<width-size; k++)
-                {
-                    int stencil_j, stencil_k ;
-                    int t_r = 0 ;
-                    int t_g = 0 ;
-                    int t_b = 0 ;
-
-                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-                    {
-                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-                        {
-                            t_r += p[CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[CONV(j+stencil_j,k+stencil_k,width)].b ;
-                        }
-                    }
-
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-                }
-            }
-
-            for(int j=1; j<height-1; j++)
-            {
-                for(int k=1; k<width-1; k++)
-                {
-
-                    float diff_r ;
-                    float diff_g ;
-                    float diff_b ;
-
-                    diff_r = (new[CONV(j  ,k  ,width)].r - p[CONV(j  ,k  ,width)].r) ;
-                    diff_g = (new[CONV(j  ,k  ,width)].g - p[CONV(j  ,k  ,width)].g) ;
-                    diff_b = (new[CONV(j  ,k  ,width)].b - p[CONV(j  ,k  ,width)].b) ;
-
-                    if ( diff_r > threshold || -diff_r > threshold
-                            ||
-                            diff_g > threshold || -diff_g > threshold
-                            ||
-                            diff_b > threshold || -diff_b > threshold
-                       ) {
-                        end = 0 ;
-                    }
-
-                    p[CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
-                    p[CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
-                    p[CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
-                }
-            }
-
         }
-        while ( threshold > 0 && !end ) ;
 
-        // printf( "Nb iter for image %d\n", n_iter ) ;
+        /* Copy the middle part of the image */
+        for(int j=height/10-size; j<height*0.9+size; j++)
+        {
+            for(int k=size; k<width-size; k++)
+            {
+                new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
+                new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
+                new[CONV(j,k,width)].b = p[CONV(j,k,width)].b ;
+            }
+        }
 
-        free (new) ;
+        /* Apply blur on the bottom part of the image (10%) */
+        for(int j=height*0.9+size; j<height-size; j++)
+        {
+            for(int k=size; k<width-size; k++)
+            {
+                int stencil_j, stencil_k ;
+                int t_r = 0 ;
+                int t_g = 0 ;
+                int t_b = 0 ;
+
+                for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
+                {
+                    for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
+                    {
+                        t_r += p[CONV(j+stencil_j,k+stencil_k,width)].r ;
+                        t_g += p[CONV(j+stencil_j,k+stencil_k,width)].g ;
+                        t_b += p[CONV(j+stencil_j,k+stencil_k,width)].b ;
+                    }
+                }
+
+                new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
+                new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
+                new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
+            }
+        }
+
+        for(int j=1; j<height-1; j++)
+        {
+            for(int k=1; k<width-1; k++)
+            {
+
+                float diff_r ;
+                float diff_g ;
+                float diff_b ;
+
+                diff_r = (new[CONV(j  ,k  ,width)].r - p[CONV(j  ,k  ,width)].r) ;
+                diff_g = (new[CONV(j  ,k  ,width)].g - p[CONV(j  ,k  ,width)].g) ;
+                diff_b = (new[CONV(j  ,k  ,width)].b - p[CONV(j  ,k  ,width)].b) ;
+
+                if ( diff_r > threshold || -diff_r > threshold
+                        ||
+                        diff_g > threshold || -diff_g > threshold
+                        ||
+                        diff_b > threshold || -diff_b > threshold
+                   ) {
+                    end = 0 ;
+                }
+
+                p[CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
+                p[CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
+                p[CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
+            }
+        }
+
+    }
+    while ( threshold > 0 && !end ) ;
+
+    // printf( "Nb iter for image %d\n", n_iter ) ;
+
+    free (new) ;
 
 }
 
