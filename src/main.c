@@ -576,8 +576,9 @@ int store_pixels( char * filename, animated_gif * image )
     (l)*(nb_c)+(c)
 
 // Configuration Variables
-int SIZE = 5;
-int THRESHOLD = 20;
+int BLUR_SIZE = 5;
+int BLUR_THRESHOLD = 20;
+int root_in_world = 0;
 
 // Filters
 void gray_filter(pixel* p, int width, int height){
@@ -772,40 +773,24 @@ void sobel_filter(pixel* p, int width, int height){
 }
 
 void blur_filter_with_defaults( pixel * p, int width, int height){
-    blur_filter(p, width, height, SIZE, THRESHOLD);
+    blur_filter(p, width, height, BLUR_SIZE, BLUR_THRESHOLD);
 }
 
-// Applying filters to all images of Gif
-void apply_to_all( animated_gif * image, void (*filter)(pixel*, int, int) )
-{
-    int i;
-    pixel ** p ;
-
-    p = image->p ;
-
-    for ( i = 0 ; i < image->n_images ; i++ )
+void bulk_apply_seq( pixel **images, int *heights, int *widths, int n_images, void (*filter)(pixel*, int, int)){
+    for ( int i = 0 ; i < n_images ; i++ )
     {
-        (*filter)(p[i], image->width[i], image->height[i]);
+        (*filter)(images[i], widths[i], heights[i]);
     }
 }
 
-void apply_gray_filter( animated_gif * image )
+// Applying filters to all images of Gif
+void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*, int, void (*f)(pixel*, int, int)), void (*filter)(pixel*, int, int) )
 {
-    apply_to_all(image, gray_filter);
-}
-
-void apply_blur_filter_with_defaults( animated_gif * image ){
-    apply_to_all(image, blur_filter_with_defaults);
-}
-
-void apply_sobel_filter( animated_gif * image )
-{
-    apply_to_all(image, sobel_filter);
+    (*bulk_apply)(image->p, image->height, image->width, image->n_images,(*filter));
 }
 
 int main( int argc, char ** argv )
 {
-
     char * input_filename ;
     char * output_filename ;
     animated_gif * image ;
@@ -840,14 +825,14 @@ int main( int argc, char ** argv )
     gettimeofday(&t1, NULL);
 
     /* Convert the pixels into grayscale */
-    apply_gray_filter( image ) ;
+    apply_to_all(image, bulk_apply_seq, gray_filter);
 
     /* Apply blur filter with convergence value */
     //apply_blur_filter( image, 5, 20 ) ;
-    apply_blur_filter_with_defaults(image);
+    apply_to_all(image, bulk_apply_seq, blur_filter_with_defaults);
 
     /* Apply sobel filter on pixels */
-    apply_sobel_filter( image ) ;
+    apply_to_all(image, bulk_apply_seq, sobel_filter);
 
     /* FILTER Timer stop */
     gettimeofday(&t2, NULL);
