@@ -831,10 +831,10 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
     MPI_Scatter(image->height, n_images_global, MPI_INT, heights, n_images_local, MPI_INT, root_in_world, MPI_COMM_WORLD);
     MPI_Scatter(image->width, n_images_global, MPI_INT, widths, n_images_local, MPI_INT, root_in_world, MPI_COMM_WORLD);
 
+    int j;
     if(rank_in_world == root_in_world){
         l_req = (MPI_Request*)malloc((n_images_global - n_images_local)*sizeof(MPI_Request));
-
-        for(int j = n_images_local; j < n_images_global; j++){
+        for(j = n_images_local; j < n_images_global; j++){
             int recv_id = (j - n_images_local) / size_in_world + 1;
             int pkg_tag = (j - n_images_local) % size_in_world;
             MPI_Isend(image->p[j], image->height[j] * image->width[j], MPI_PIXEL, recv_id, pkg_tag, MPI_COMM_WORLD,&l_req[j - n_images_local] );
@@ -849,8 +849,7 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
     } else{
         l_req = (MPI_Request*)malloc(n_images_local * sizeof(MPI_Request));
         gif_local = malloc(n_images_local*sizeof(pixel*));
-
-        for(int j = 0; j < n_images_local; j++){
+        for(j = 0; j < n_images_local; j++){
             gif_local[j] = malloc(heights[j] * widths[j] * sizeof(pixel));
             MPI_Irecv(gif_local[j], heights[j] * widths[j], MPI_PIXEL, root_in_world, j, MPI_COMM_WORLD, &l_req[j]);
         }
@@ -858,13 +857,13 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
         MPI_Waitall(n_images_local, l_req, MPI_STATUS_IGNORE);
 
         bulk_apply_seq(gif_local, heights, widths, n_images_local, filter);
-        for(int j = 0; j < n_images_local; j++){
+        for(j = 0; j < n_images_local; j++){
             MPI_Isend(gif_local[j], heights[j] * widths[j], MPI_PIXEL, root_in_world, j, MPI_COMM_WORLD, &l_req[j]);
         }
 
         MPI_Waitall(n_images_local, l_req, MPI_STATUS_IGNORE);
 
-        for(int j = 0; j < n_images_local; j++){
+        for(j = 0; j < n_images_local; j++){
             free(gif_local[j]);
         }
         free(gif_local);
