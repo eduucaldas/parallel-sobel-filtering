@@ -791,8 +791,15 @@ void blur_filter_with_defaults( pixel * p, int width, int height){
     blur_filter(p, width, height, BLUR_SIZE, BLUR_THRESHOLD);
 }
 
-void bulk_apply_seq( pixel **images, int *heights, int *widths, int n_images, void (*filter)(pixel*, int, int)){
-    for ( int i = 0 ; i < n_images ; i++ )
+void complete_filter( pixel * p, int width, int height) {
+    gray_filter(p, width, height);
+    blur_filter_with_defaults(p, width, height);
+    sobel_filter(p, width, height);
+}
+
+void bulk_apply_seq( pixel **images, int *widths, int *heights, int n_images, void (*filter)(pixel*, int, int)){
+    int i;
+    for ( i = 0 ; i < n_images ; i++ )
     {
         (*filter)(images[i], widths[i], heights[i]);
     }
@@ -801,7 +808,7 @@ void bulk_apply_seq( pixel **images, int *heights, int *widths, int n_images, vo
 // Applying filters to all images of Gif
 void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*, int, void (*f)(pixel*, int, int)), void (*filter)(pixel*, int, int) )
 {
-    (*bulk_apply)(image->p, image->height, image->width, image->n_images,(*filter));
+    (*bulk_apply)(image->p, image->width, image->height, image->n_images, (*filter));
 }
 
 void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, int) ){
@@ -840,7 +847,7 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
             MPI_Isend(image->p[j], image->height[j] * image->width[j], MPI_PIXEL, recv_id, pkg_tag, MPI_COMM_WORLD,&l_req[j - n_images_local] );
             MPI_Irecv(image->p[j], image->height[j] * image->width[j], MPI_PIXEL, recv_id, pkg_tag, MPI_COMM_WORLD, &l_req[j - n_images_local]);
         }
-        bulk_apply_seq(image->p, heights, widths, n_images_local, filter);
+        bulk_apply_seq(image->p, widths, heights, n_images_local, filter);
 
         MPI_Waitall(n_images_global - n_images_local, l_req, MPI_STATUS_IGNORE);
 
@@ -856,7 +863,7 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
 
         MPI_Waitall(n_images_local, l_req, MPI_STATUS_IGNORE);
 
-        bulk_apply_seq(gif_local, heights, widths, n_images_local, filter);
+        bulk_apply_seq(gif_local, widths, heights, n_images_local, filter);
         for(j = 0; j < n_images_local; j++){
             MPI_Isend(gif_local[j], heights[j] * widths[j], MPI_PIXEL, root_in_world, j, MPI_COMM_WORLD, &l_req[j]);
         }
