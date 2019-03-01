@@ -579,13 +579,24 @@ int store_pixels( char * filename, animated_gif * image )
     (l)*(nb_c)+(c)
 
 // Configuration Variables
-int BLUR_SIZE = 5;
-int BLUR_THRESHOLD = 20;
+#define BLUR_SIZE 5
+#define BLUR_THRESHOLD 20
 int root_in_world = 0;
 
+int eq_pixel(pixel a, pixel b){
+    return (a.r == b.r) && (a.g == b.g) && (a.b == b.b);
+}
+
+int black_pixel(pixel a){
+    if((a.r == 255) && (a.g == 255) && (a.b == 255)) return 1;
+    else if((a.r == 0) && (a.g == 0) && (a.b == 0)) return 0;
+    else return 999999;
+
+}
 // Filters
 void gray_filter(pixel* p, int width, int height){
-    for ( int j = 0 ; j < width * height ; j++ )
+    int j;
+    for ( j = 0 ; j < width * height ; j++ )
     {
         int moy ;
 
@@ -608,15 +619,16 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
     pixel * new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
 
     /* Perform at least one blur iteration */
+    int j, k;
     do
     {
         end = 1 ;
         n_iter++ ;
 
         /* Apply blur on top part of image (10%) */
-        for(int j=size; j<height/10-size; j++)
+        for(j=size; j<height/10-size; j++)
         {
-            for(int k=size; k<width-size; k++)
+            for(k=size; k<width-size; k++)
             {
                 int stencil_j, stencil_k ;
                 int t_r = 0 ;
@@ -640,9 +652,9 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
         }
 
         /* Copy the middle part of the image */
-        for(int j=height/10-size; j<height*0.9+size; j++)
+        for(j=height/10-size; j<height*0.9+size; j++)
         {
-            for(int k=size; k<width-size; k++)
+            for(k=size; k<width-size; k++)
             {
                 new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
                 new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
@@ -651,9 +663,9 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
         }
 
         /* Apply blur on the bottom part of the image (10%) */
-        for(int j=height*0.9+size; j<height-size; j++)
+        for(j=height*0.9+size; j<height-size; j++)
         {
-            for(int k=size; k<width-size; k++)
+            for(k=size; k<width-size; k++)
             {
                 int stencil_j, stencil_k ;
                 int t_r = 0 ;
@@ -676,9 +688,9 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
             }
         }
 
-        for(int j=1; j<height-1; j++)
+        for(j=1; j<height-1; j++)
         {
-            for(int k=1; k<width-1; k++)
+            for(k=1; k<width-1; k++)
             {
 
                 float diff_r ;
@@ -717,10 +729,10 @@ void sobel_filter(pixel* p, int width, int height){
     pixel * sobel ;
 
     sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
-    for(int j=1; j<height-1; j++)
+    int j, k;
+    for(j=1; j<height-1; j++)
     {
-        for(int k=1; k<width-1; k++)
+        for(k=1; k<width-1; k++)
         {
             int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
             int pixel_blue_so, pixel_blue_s, pixel_blue_se;
@@ -761,9 +773,9 @@ void sobel_filter(pixel* p, int width, int height){
         }
     }
 
-    for(int j=1; j<height-1; j++)
+    for(j=1; j<height-1; j++)
     {
-        for(int k=1; k<width-1; k++)
+        for(k=1; k<width-1; k++)
         {
             p[CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
             p[CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
