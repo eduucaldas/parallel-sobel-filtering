@@ -925,7 +925,7 @@ int main( int argc, char ** argv )
         for(i = 0; i < n_images; i++){
             int j;
             if(height != image->height[i] || width != image->width[i]){
-                printf("WOW: your gif has varying dimensions\n");
+                printf("WOW: your gif has varying dimensions\nfst image: (%d, %d)\nsnd image: (%d, %d)\n", width, height, image->width[i], image->height[i]);
                 MPI_Finalize();
                 return 1;
             }
@@ -940,24 +940,9 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
+    apply_to_all_MPI_stat(image, complete_filter);
 
     if(rank_in_world == root_in_world){
-
-        /* Convert the pixels into grayscale */
-        apply_to_all(image, bulk_apply_seq, complete_filter);
-
-        //apply_to_all(image, bulk_apply_seq, gray_filter);
-
-        //apply_to_all_MPI_stat(image, complete_filter);
-
-        /* Apply blur filter with convergence value */
-        //apply_blur_filter( image, 5, 20 ) ;
-        //apply_to_all(image, bulk_apply_seq, blur_filter_with_defaults);
-        //apply_to_all_MPI_stat(image, blur_filter_with_defaults);
-
-        /* Apply sobel filter on pixels */
-        //apply_to_all(image, bulk_apply_seq, sobel_filter);
-        //apply_to_all_MPI_stat(image, sobel_filter);
         int i;
         for ( i = 0 ; i < n_images; i++ ) {
             gray_filter(p_original[i], width, height);
