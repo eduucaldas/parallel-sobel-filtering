@@ -622,6 +622,17 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
     int j, k;
     do
     {
+        /* Copy the middle part of the image */
+        for(j=0; j<height; j++)
+        {
+            for(k=0; k<width; k++)
+            {
+                new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
+                new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
+                new[CONV(j,k,width)].b = p[CONV(j,k,width)].b ;
+            }
+        }
+
         end = 1 ;
         n_iter++ ;
 
@@ -648,17 +659,6 @@ void blur_filter(pixel * p, int width, int height, int size, int threshold){
                 new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
                 new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
                 new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            }
-        }
-
-        /* Copy the middle part of the image */
-        for(j=height/10-size; j<height*0.9+size; j++)
-        {
-            for(k=size; k<width-size; k++)
-            {
-                new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
-                new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
-                new[CONV(j,k,width)].b = p[CONV(j,k,width)].b ;
             }
         }
 
@@ -817,67 +817,57 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
         Master sends equal packages of work to all slave nodes and then performs the rest of the work himself
         Uses Isend and Irecv with waitall barrier afterwards
     */
+    int l_id, g_id, s_id; // local_gif_id, global_gif_id, slave_id
     int rank_in_world, size_in_world;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
     MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
 
+    if(size_in_world == 1) return apply_to_all(image, bulk_apply_seq, (*filter));
+    // From here on size_in_world > 1, and we use pure master slave architecture
+    int n_slaves = size_in_world - 1;
+
+    int height;
+    int width;
     int n_images_global;
-    if(rank_in_world == root_in_world) n_images_global =  image->n_images;
+    if(rank_in_world == root_in_world) {
+        n_images_global = image->n_images;
+        width  = image->width[0];
+        height = image->height[0];
+    }
+
     MPI_Bcast(&n_images_global, 1, MPI_INT, root_in_world, MPI_COMM_WORLD);
+    MPI_Bcast(&width, 1, MPI_INT, root_in_world, MPI_COMM_WORLD);
+    MPI_Bcast(&height, 1, MPI_INT, root_in_world, MPI_COMM_WORLD);
 
-    // load_balancing
-    int n_images_local;
-    if(rank_in_world == root_in_world) n_images_local = n_images_global % size_in_world;
-    else n_images_local = n_images_global / size_in_world;
+    // load_balancing: we share work in a bulk manner, not round-robin
+    int* n_images_rank = malloc(size_in_world * sizeof(int));
+    n_images_rank[root_in_world] = 0;
+    for(s_id = 1; s_id < size_in_world; s_id++){
+        n_images_rank[s_id] = n_images_global / n_slaves + (s_id <= (n_images_global % n_slaves));
+    }// uses the fact that root_in_world = 0
 
-    pixel ** gif_local;
-    int * heights;
-    int * widths;
-    MPI_Request * l_req;
-
-    MPI_Scatter(image->height, n_images_global, MPI_INT, heights, n_images_local, MPI_INT, root_in_world, MPI_COMM_WORLD);
-    MPI_Scatter(image->width, n_images_global, MPI_INT, widths, n_images_local, MPI_INT, root_in_world, MPI_COMM_WORLD);
+    pixel * gif_local;
 
     int j;
     if(rank_in_world == root_in_world){
-        l_req = (MPI_Request*)malloc((n_images_global - n_images_local)*sizeof(MPI_Request));
-        for(j = n_images_local; j < n_images_global; j++){
-            int recv_id = (j - n_images_local) / size_in_world + 1;
-            int pkg_tag = (j - n_images_local) % size_in_world;
-            MPI_Isend(image->p[j], image->height[j] * image->width[j], MPI_PIXEL, recv_id, pkg_tag, MPI_COMM_WORLD,&l_req[j - n_images_local] );
-            MPI_Irecv(image->p[j], image->height[j] * image->width[j], MPI_PIXEL, recv_id, pkg_tag, MPI_COMM_WORLD, &l_req[j - n_images_local]);
+        g_id = 0;
+        for(s_id = 1; s_id < size_in_world; s_id++){
+            for(l_id = 0; l_id < n_images_rank[s_id]; l_id++, g_id++){
+                MPI_Send(image->p[g_id], height * width, MPI_PIXEL, s_id, l_id, MPI_COMM_WORLD);
+                MPI_Recv(image->p[g_id], height * width, MPI_PIXEL, s_id, l_id, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
         }
-        bulk_apply_seq(image->p, widths, heights, n_images_local, filter);
-
-        MPI_Waitall(n_images_global - n_images_local, l_req, MPI_STATUS_IGNORE);
-
-
-        free(l_req);
     } else{
-        l_req = (MPI_Request*)malloc(n_images_local * sizeof(MPI_Request));
-        gif_local = malloc(n_images_local*sizeof(pixel*));
-        for(j = 0; j < n_images_local; j++){
-            gif_local[j] = malloc(heights[j] * widths[j] * sizeof(pixel));
-            MPI_Irecv(gif_local[j], heights[j] * widths[j], MPI_PIXEL, root_in_world, j, MPI_COMM_WORLD, &l_req[j]);
-        }
-
-        MPI_Waitall(n_images_local, l_req, MPI_STATUS_IGNORE);
-
-        bulk_apply_seq(gif_local, widths, heights, n_images_local, filter);
-        for(j = 0; j < n_images_local; j++){
-            MPI_Isend(gif_local[j], heights[j] * widths[j], MPI_PIXEL, root_in_world, j, MPI_COMM_WORLD, &l_req[j]);
-        }
-
-        MPI_Waitall(n_images_local, l_req, MPI_STATUS_IGNORE);
-
-        for(j = 0; j < n_images_local; j++){
-            free(gif_local[j]);
+        int n_images_local = n_images_rank[rank_in_world];
+        gif_local = malloc(height * width * sizeof(pixel));
+        for(l_id = 0; l_id < n_images_local; l_id++){
+            MPI_Recv(gif_local, height * width, MPI_PIXEL, root_in_world, l_id, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            (*filter)(gif_local, width, height);
+            MPI_Send(gif_local, height * width, MPI_PIXEL, root_in_world, l_id, MPI_COMM_WORLD);
         }
         free(gif_local);
-        free(l_req);
     }
 }
-
 
 int main( int argc, char ** argv )
 {
@@ -900,6 +890,9 @@ int main( int argc, char ** argv )
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
     MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
+    int n_images,height, width;
+    pixel** p_original;
+
     if(rank_in_world == root_in_world){
         if ( argc < 3 )
         {
@@ -924,22 +917,65 @@ int main( int argc, char ** argv )
 
         printf( "GIF loaded from file %s with %d image(s) in %lf s\n",
                 input_filename, image->n_images, duration ) ;
+        int i;
+        n_images = image->n_images;
+        width = image->width[0];
+        height = image->height[0];
+        p_original = (pixel**)malloc(n_images * sizeof(pixel*));
+        for(i = 0; i < n_images; i++){
+            int j;
+            if(height != image->height[i] || width != image->width[i]){
+                printf("WOW: your gif has varying dimensions\n");
+                MPI_Finalize();
+                return 1;
+            }
+            p_original[i] = (pixel*)malloc(width*height*sizeof(pixel));
+            for(j = 0; j < width*height; j++){
+                p_original[i][j] = image->p[i][j];
+            }
+        }
+        printf( "GIF STATS: width = %d, height = %d, number of images = %d\n", image->height[0], image->width[0], image->n_images);
 
         /* FILTER Timer start */
         gettimeofday(&t1, NULL);
     }
 
-    /* Convert the pixels into grayscale */
-    apply_to_all(image, bulk_apply_seq, gray_filter);
-
-    /* Apply blur filter with convergence value */
-    //apply_blur_filter( image, 5, 20 ) ;
-    apply_to_all(image, bulk_apply_seq, blur_filter_with_defaults);
-
-    /* Apply sobel filter on pixels */
-    apply_to_all(image, bulk_apply_seq, sobel_filter);
 
     if(rank_in_world == root_in_world){
+
+        /* Convert the pixels into grayscale */
+        apply_to_all(image, bulk_apply_seq, complete_filter);
+
+        //apply_to_all(image, bulk_apply_seq, gray_filter);
+
+        //apply_to_all_MPI_stat(image, complete_filter);
+
+        /* Apply blur filter with convergence value */
+        //apply_blur_filter( image, 5, 20 ) ;
+        //apply_to_all(image, bulk_apply_seq, blur_filter_with_defaults);
+        //apply_to_all_MPI_stat(image, blur_filter_with_defaults);
+
+        /* Apply sobel filter on pixels */
+        //apply_to_all(image, bulk_apply_seq, sobel_filter);
+        //apply_to_all_MPI_stat(image, sobel_filter);
+        int i;
+        for ( i = 0 ; i < n_images; i++ ) {
+            gray_filter(p_original[i], width, height);
+            blur_filter_with_defaults(p_original[i], width, height);
+            sobel_filter(p_original[i], width, height);
+        }
+
+        for ( i = 0 ; i < n_images; i++ ) {
+            int x, y, j;
+            for(y = 0; y < height; y++){
+                for(x = 0; x < width; x++){
+                    j = CONV(y, x, width);
+                    if(!eq_pixel(image->p[i][j], p_original[i][j])){
+                        printf("diff on img %3d in pixel (%3d,%3d): p_std = %d and p_new = %d\n", i, x, y, black_pixel(p_original[i][j]), black_pixel(image->p[i][j]));
+                    }
+                }
+            }
+        }
         /* FILTER Timer stop */
         gettimeofday(&t2, NULL);
 
@@ -958,7 +994,7 @@ int main( int argc, char ** argv )
 
         duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
 
-        printf( "Export done in %lf s in file %s\n", duration, output_filename ) ;
+        printf( "Export done in %lf s in file %s\n--------------------------------------\n", duration, output_filename ) ;
 
     }
 
