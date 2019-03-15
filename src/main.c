@@ -1169,9 +1169,55 @@ void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, i
     }
 }
 
+//------------------------ END OF MPI -------------------------------
+//------------------------ BEGIN OF DEBUG TOOLS -------------------------------
+
+pixel** reference_treated(pixel** p, int n_images, int width, int height){
+    pixel** p_ref;
+    p_ref = (pixel**)malloc(n_images * sizeof(pixel*));
+
+    int i, j;
+    for(i = 0; i < n_images; i++){
+        p_ref[i] = (pixel*)malloc(width*height*sizeof(pixel));
+        for(j = 0; j < width*height; j++){
+            p_ref[i][j] = p[i][j];
+        }
+        complete_filter_seq(p_ref[i], width, height);
+    }
+    return p_ref;
+}
+
+void print_diff_with_ref(pixel** p, int n_images, int width, int height, pixel** p_ref){
+    int i;
+    for ( i = 0 ; i < n_images; i++ ) {
+        int x, y, j;
+        for(y = 0; y < height; y++){
+            for(x = 0; x < width; x++){
+                j = CONV(y, x, width);
+                if(!eq_pixel(p[i][j], p_ref[i][j])){
+                    printf("diff on img %3d in pixel (%3d,%3d): p_std = %d and p_new = %d\n", i, x, y, black_pixel(p_ref[i][j]), black_pixel(p[i][j]));
+                }
+            }
+        }
+    }
+}
+
+void hello_omp_mpi(){
+    int mpi_rank, mpi_size ;
+    MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
+    MPI_Comm_size( MPI_COMM_WORLD, &mpi_size ) ;
+#pragma omp parallel
+    {
+        printf("Hello MPI %d (%d) & OpenMP %d (%d)\n",mpi_rank, mpi_size,
+                omp_get_thread_num(),
+                omp_get_num_threads() ) ;
+    }
+}
+
+//------------------------ END OF DEBUG TOOLS -------------------------------
+
 int main( int argc, char ** argv )
 {
-
     char * input_filename ;
     char * output_filename ;
     animated_gif * image ;
@@ -1185,7 +1231,6 @@ int main( int argc, char ** argv )
         printf("Error starting MPI program. Terminating.\n");
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
-
     MPI_Type_contiguous(3, MPI_INT, &MPI_PIXEL);
     MPI_Type_commit(&MPI_PIXEL);
 
@@ -1222,17 +1267,12 @@ int main( int argc, char ** argv )
         n_images = image->n_images;
         width = image->width[0];
         height = image->height[0];
-        p_original = (pixel**)malloc(n_images * sizeof(pixel*));
         for(i = 0; i < n_images; i++){
             int j;
             if(height != image->height[i] || width != image->width[i]){
                 printf("WOW: your gif has varying dimensions\nfst image: (%d, %d)\nsnd image: (%d, %d)\n", width, height, image->width[i], image->height[i]);
                 MPI_Finalize();
                 return 1;
-            }
-            p_original[i] = (pixel*)malloc(width*height*sizeof(pixel));
-            for(j = 0; j < width*height; j++){
-                p_original[i][j] = image->p[i][j];
             }
         }
         printf( "GIF STATS: width = %d, height = %d, number of images = %d\n", image->height[0], image->width[0], image->n_images);
@@ -1241,27 +1281,11 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-    apply_to_all_MPI_stat(image, complete_filter);
+    apply_to_all_MPI_stat(image, complete_filter_omp);
 
     if(rank_in_world == root_in_world){
         int i;
-        for ( i = 0 ; i < n_images; i++ ) {
-            gray_filter(p_original[i], width, height);
-            blur_filter_with_defaults(p_original[i], width, height);
-            sobel_filter(p_original[i], width, height);
-        }
 
-        for ( i = 0 ; i < n_images; i++ ) {
-            int x, y, j;
-            for(y = 0; y < height; y++){
-                for(x = 0; x < width; x++){
-                    j = CONV(y, x, width);
-                    if(!eq_pixel(image->p[i][j], p_original[i][j])){
-                        printf("diff on img %3d in pixel (%3d,%3d): p_std = %d and p_new = %d\n", i, x, y, black_pixel(p_original[i][j]), black_pixel(image->p[i][j]));
-                    }
-                }
-            }
-        }
         /* FILTER Timer stop */
         gettimeofday(&t2, NULL);
 
