@@ -544,6 +544,16 @@ void bulk_apply_seq( pixel **images, int *widths, int *heights, int n_images, vo
     }
 }
 
+// Needs testing
+void bulk_apply_omp( pixel **images, int *widths, int *heights, int n_images, void (*filter)(pixel*, int, int)){
+    int i;
+#pragma omp for schedule(static)
+    for ( i = 0 ; i < n_images ; i++ )
+    {
+        (*filter)(images[i], widths[i], heights[i]);
+    }
+}
+
 // Applying filters to all images of Gif
 void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*, int, void (*f)(pixel*, int, int)), void (*filter)(pixel*, int, int) )
 {
