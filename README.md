@@ -20,3 +20,12 @@ TODO
 
 ## Benchmarking
 TODO
+
+## TODO
+- [ ] Separate files, main is too big
+- [ ] mix mpi with openmp
+- [ ] adapt to treat files with deifferent height and width
+- [ ] mpi with better perf
+- [ ] mpi for treating pieces of images
+- [ ] benchmarking framework
+
