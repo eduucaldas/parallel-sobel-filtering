@@ -655,6 +655,23 @@ void hello_omp_mpi(){
     }
 }
 
+bool is_constant_size_gif(animated_gif * image){
+    int n_images, width, height;
+    n_images = image->n_images;
+    width = image->width[0];
+    height = image->height[0];
+
+    int i;
+    for(i = 0; i < n_images; i++){
+        int j;
+        if(height != image->height[i] || width != image->width[i]){
+            printf("WOW: your gif has varying dimensions\nfst image: (%d, %d)\nsnd image: (%d, %d)\n", width, height, image->width[i], image->height[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
 //------------------------ END OF DEBUG TOOLS -------------------------------
 
 int main( int argc, char ** argv )
@@ -704,18 +721,11 @@ int main( int argc, char ** argv )
 
         printf( "GIF loaded from file %s with %d image(s) in %lf s\n",
                 input_filename, image->n_images, duration ) ;
-        int i;
-        n_images = image->n_images;
-        width = image->width[0];
-        height = image->height[0];
-        for(i = 0; i < n_images; i++){
-            int j;
-            if(height != image->height[i] || width != image->width[i]){
-                printf("WOW: your gif has varying dimensions\nfst image: (%d, %d)\nsnd image: (%d, %d)\n", width, height, image->width[i], image->height[i]);
-                MPI_Finalize();
-                return 1;
-            }
+        if(!is_constant_size_gif(image)){
+            MPI_Finalize();
+            return 1;
         }
+
         printf( "GIF STATS: width = %d, height = %d, number of images = %d\n", image->height[0], image->width[0], image->n_images);
 
         /* FILTER Timer start */
