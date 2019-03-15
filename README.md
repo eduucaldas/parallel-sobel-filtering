@@ -22,10 +22,12 @@ TODO
 TODO
 
 ## TODO
-- [ ] Separate files, main is too big
-- [ ] mix mpi with openmp
-- [ ] adapt to treat files with deifferent height and width
-- [ ] mpi with better perf
-- [ ] mpi for treating pieces of images
+- [x] Separate files, main is too big
+- [x] mix mpi with openmp
+- [ ] optimise: MPI to treat sequence of images
+- [ ] implement: openMP to treat sequence of images
+- [ ] implement: MPI by splitting image
+- [ ] implement: CUDA by splitting image
+- [ ] adapt to treat files with different height and width
 - [ ] benchmarking framework
 
