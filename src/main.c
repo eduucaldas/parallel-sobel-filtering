@@ -10,10 +10,9 @@
 #include <sys/time.h>
 
 #include <gif_io.h>
-
 #include <omp.h>
 #include <mpi.h>
-
+#include <cuda_filters.h>
 //------------------------ END OF FILE TREATING -------------------------------
 
 #define CONV(l,c,nb_c) \
@@ -96,7 +95,7 @@ void gray_filter_mpi(pixel* p, int width, int height){
     int s_id, p_size, p_start;
     
     if(rank_in_world == root_in_world) {
-        for(int s_id = 1; s_id < size_in_world; s_id++) {
+        for(s_id = 1; s_id < size_in_world; s_id++) {
             p_size = chunk_size + (s_id <= (width * height) % n_slaves ? 1 : 0);
             if(s_id <= (width * height) % n_slaves) {
                 p_size = chunk_size + 1;
@@ -262,7 +261,6 @@ void blur_filter_seq(pixel * p, int width, int height, int size, int threshold){
 
 }
 
-// needs the same change as in blur_filter_seq_seq
 void blur_filter_omp(pixel * p, int width, int height, int size, int threshold){
     int n_iter = 0 ;
     int end = 1;
@@ -279,6 +277,18 @@ void blur_filter_omp(pixel * p, int width, int height, int size, int threshold){
 #pragma omp parallel
         {
             int j, k;
+
+            /* Copy the middle part of the image */
+#pragma omp for schedule(static)
+            for(j=0; j<height; j++)
+            {
+                for(k=0; k<width; k++)
+                {
+                    new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
+                    new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
+                    new[CONV(j,k,width)].b = p[CONV(j,k,width)].b ;
+                }
+            }
 
             /* Apply blur on top part of image (10%) */
 #pragma omp for schedule(static)
@@ -308,18 +318,6 @@ void blur_filter_omp(pixel * p, int width, int height, int size, int threshold){
             }
 
             int j_end = height*0.9+size;
-
-            /* Copy the middle part of the image */
-#pragma omp for schedule(static)
-            for(j=height/10-size; j<j_end; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    new[CONV(j,k,width)].r = p[CONV(j,k,width)].r ;
-                    new[CONV(j,k,width)].g = p[CONV(j,k,width)].g ;
-                    new[CONV(j,k,width)].b = p[CONV(j,k,width)].b ;
-                }
-            }
 
             /* Apply blur on the bottom part of the image (10%) */
 #pragma omp for schedule(static)
@@ -598,6 +596,13 @@ void complete_filter_seq( pixel * p, int width, int height) {
 
 void complete_filter_omp( pixel * p, int width, int height) {
     gray_filter_omp(p, width, height);
+    blur_filter_omp(p, width, height, BLUR_SIZE, BLUR_THRESHOLD);
+    sobel_filter_omp(p, width, height);
+}
+
+// To be completed
+void complete_filter_cuda( pixel * p, int width, int height) {
+    gray_filter_cuda(p, width, height);
     blur_filter_seq_with_defaults(p, width, height);
     sobel_filter_omp(p, width, height);
 }

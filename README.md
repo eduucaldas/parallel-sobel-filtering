@@ -24,10 +24,17 @@ TODO
 ## TODO
 - [x] Separate files, main is too big
 - [x] mix mpi with openmp
-- [ ] optimise: MPI to treat sequence of images
-- [ ] implement: openMP to treat sequence of images
+- [ ] optimise: bulk\_MPI
+- [ ] adapt: bulk\_MPI to treat gifs with different height and width
+- [ ] implement: bulk\_openMP
 - [ ] implement: MPI by splitting image
+- [x] implement: OMP by splitting image
+    + [x] gray\_filter
+    + [x] blur\_filter
+    + [x] sobel\_filter
 - [ ] implement: CUDA by splitting image
-- [ ] adapt to treat files with different height and width
+    + [x] gray\_filter
+    + [ ] blur\_filter
+    + [ ] sobel\_filter
 - [ ] benchmarking framework
 
