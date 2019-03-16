@@ -28,9 +28,9 @@ TODO
 - [ ] adapt: bulk\_MPI to treat gifs with different height and width
 - [ ] implement: bulk\_openMP
 - [ ] implement: MPI by splitting image
-- [ ] implement: OMP by splitting image
+- [x] implement: OMP by splitting image
     + [x] gray\_filter
-    + [ ] blur\_filter
+    + [x] blur\_filter
     + [x] sobel\_filter
 - [ ] implement: CUDA by splitting image
     + [x] gray\_filter
