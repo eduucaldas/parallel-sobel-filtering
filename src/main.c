@@ -79,6 +79,73 @@ void gray_filter_omp(pixel* p, int width, int height){
     }
 }
 
+// Gray-filter for a image splitted using MPI
+// Not yet used or tested
+void gray_filter_mpi(pixel* p, int width, int height){
+    int rank_in_world, size_in_world;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
+    MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
+
+    if(size_in_world == 1) {
+        gray_filter_seq(p, width, height);
+        return;
+    }
+
+    int n_slaves = size_in_world - 1;
+    int chunk_size = (width * height) / n_slaves;
+    int s_id, p_size, p_start;
+    
+    if(rank_in_world == root_in_world) {
+        for(int s_id = 1; s_id < size_in_world; s_id++) {
+            p_size = chunk_size + (s_id <= (width * height) % n_slaves ? 1 : 0);
+            if(s_id <= (width * height) % n_slaves) {
+                p_size = chunk_size + 1;
+                p_start = (s_id - 1) * (chunk_size + 1);
+            }
+            else {
+                p_size = chunk_size;
+                p_start = (s_id - 1) * chunk_size + ((width * height) % n_slaves);
+            }
+            MPI_Send(&p[p_start], p_size, MPI_PIXEL, s_id, s_id, MPI_COMM_WORLD);
+            MPI_Recv(&p[p_start], p_size, MPI_PIXEL, s_id, s_id, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+    else {
+        int j;
+        pixel * p_local;
+
+        if(rank_in_world <= (width * height) % n_slaves) {
+            p_size = chunk_size + 1;
+            p_start = (rank_in_world - 1) * (chunk_size + 1);
+        }
+        else {
+            p_size = chunk_size;
+            p_start = (rank_in_world - 1) * chunk_size + ((width * height) % n_slaves);
+        }
+
+        p_local = malloc(p_size * sizeof(pixel));
+
+        MPI_Recv(p_local, p_size, MPI_PIXEL, root_in_world, rank_in_world, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
+        for (j = 0; j < width * height ; j++ )
+        {
+            int moy ;
+
+            // moy = p[i][j].r/4 + ( p[i][j].g * 3/4 ) ;
+            moy = (p[j].r + p[j].g + p[j].b)/3 ;
+            if ( moy < 0 ) moy = 0 ;
+            if ( moy > 255 ) moy = 255 ;
+
+            p[j].r = moy ;
+            p[j].g = moy ;
+            p[j].b = moy ;
+        }
+
+        MPI_Send(p_local, p_size, MPI_PIXEL, root_in_world, rank_in_world, MPI_COMM_WORLD);
+        free(p_local);
+    }
+}
+
 // Blur Filter ------------------------------------------------------------
 
 void blur_filter_seq(pixel * p, int width, int height, int size, int threshold){
