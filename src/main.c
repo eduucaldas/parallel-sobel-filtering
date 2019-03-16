@@ -10,10 +10,9 @@
 #include <sys/time.h>
 
 #include <gif_io.h>
-
 #include <omp.h>
 #include <mpi.h>
-
+#include <cuda_filters.h>
 //------------------------ END OF FILE TREATING -------------------------------
 
 #define CONV(l,c,nb_c) \
@@ -78,6 +77,7 @@ void gray_filter_omp(pixel* p, int width, int height){
         }
     }
 }
+
 
 // Blur Filter ------------------------------------------------------------
 
@@ -535,6 +535,13 @@ void complete_filter_omp( pixel * p, int width, int height) {
     sobel_filter_omp(p, width, height);
 }
 
+// To be completed
+void complete_filter_cuda( pixel * p, int width, int height) {
+    gray_filter_cuda(p, width, height);
+    blur_filter_seq_with_defaults(p, width, height);
+    sobel_filter_omp(p, width, height);
+}
+
 // apply filter to sequence of Images ----------------------------
 void bulk_apply_seq( pixel **images, int *widths, int *heights, int n_images, void (*filter)(pixel*, int, int)){
     int i;
@@ -742,7 +749,7 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-    apply_to_all_MPI_stat(image, complete_filter_omp);
+    apply_to_all_MPI_stat(image, complete_filter_cuda);
 
     if(rank_in_world == root_in_world){
         int i;
