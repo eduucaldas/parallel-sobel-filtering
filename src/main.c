@@ -605,8 +605,7 @@ void complete_filter_omp( pixel * p, int width, int height) {
 void complete_filter_cuda( pixel * p, int width, int height) {
     gray_filter_cuda(p, width, height);
     blur_filter_cuda(p, width, height, BLUR_SIZE, BLUR_THRESHOLD);
-    //blur_filter_seq_with_defaults(p, width, height);
-    sobel_filter_omp(p, width, height);
+    sobel_filter_cuda(p, width, height);
 }
 
 // apply filter to sequence of Images ----------------------------

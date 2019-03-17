@@ -7,4 +7,6 @@ void gray_filter_cuda(pixel* p, int width, int height);
 
 void blur_filter_cuda(pixel* p, int width, int height, int size, int threshold);
 
+void sobel_filter_cuda(pixel* p, int width, int height);
+
 #endif

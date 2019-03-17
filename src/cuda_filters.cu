@@ -133,3 +133,74 @@ void blur_filter_cuda(pixel* p, int width, int height, int size, int threshold) 
 
     cudaMemcpy(p, p_0, width * height * sizeof(pixel), cudaMemcpyDeviceToHost);
 }
+
+
+
+__global__ void
+sobel_kernel(pixel* sobel, pixel* p_0, int width, int height) {
+    int i;
+    i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    int j, k;
+    j = i / width;
+    k = i % width;
+
+    if (j >= 1 && j < height - 1 && k >= 1 && k < width - 1){
+        int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
+        int pixel_blue_so, pixel_blue_s, pixel_blue_se;
+        int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+
+        float deltaX_blue ;
+        float deltaY_blue ;
+        float val_blue;
+
+        pixel_blue_no = p_0[CONV(j-1,k-1,width)].b ;
+        pixel_blue_n  = p_0[CONV(j-1,k  ,width)].b ;
+        pixel_blue_ne = p_0[CONV(j-1,k+1,width)].b ;
+        pixel_blue_so = p_0[CONV(j+1,k-1,width)].b ;
+        pixel_blue_s  = p_0[CONV(j+1,k  ,width)].b ;
+        pixel_blue_se = p_0[CONV(j+1,k+1,width)].b ;
+        pixel_blue_o  = p_0[CONV(j  ,k-1,width)].b ;
+        pixel_blue    = p_0[CONV(j  ,k  ,width)].b ;
+        pixel_blue_e  = p_0[CONV(j  ,k+1,width)].b ;
+
+        deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;
+
+        deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
+
+        val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
+
+
+        if ( val_blue > 50 )
+        {
+            sobel[i].r = 255 ;
+            sobel[i].g = 255 ;
+            sobel[i].b = 255 ;
+        } else
+        {
+            sobel[i].r = 0 ;
+            sobel[i].g = 0 ;
+            sobel[i].b = 0 ;
+        }
+    }
+    else if(j == 0 || j == height - 1 || k == 0 || k == width - 1) {
+        sobel[i].r = p_0[i].r;
+        sobel[i].g = p_0[i].g;
+        sobel[i].b = p_0[i].b;
+    }
+}
+
+void sobel_filter_cuda(pixel* p, int width, int height) {
+    pixel *sobel, *d_p;
+    
+    cudaMalloc((void **)&d_p, width * height * sizeof(pixel));
+    cudaMemcpy(d_p, p, width * height * sizeof(pixel), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&sobel, width * height * sizeof(pixel));
+
+    sobel_kernel<<<grid_dim(width*height, BLOCK_DIM),BLOCK_DIM>>>(sobel, d_p, width, height);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(p, sobel, width * height * sizeof(pixel), cudaMemcpyDeviceToHost);
+}
+
