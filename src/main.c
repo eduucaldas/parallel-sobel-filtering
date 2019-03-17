@@ -660,6 +660,23 @@ void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*,
 
 //------------------------ BEGIN OF MPI -------------------------------
 
+//------------------------ BEGIN OF GROUPING -------------------------------
+
+void set_MPI_comm_in_node(MPI_Comm * comm_in_node){
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, comm_in_node);
+}
+
+
+void set_MPI_comm_btwn_node(MPI_Comm comm_in_node, MPI_Comm * comm_btwn_nodes){
+    int rank_in_node;
+    MPI_Comm_rank(comm_in_node, &rank_in_node);
+    int is_rank0, node_count;
+    is_rank0 = (rank_in_node == 0) ? 1 : MPI_UNDEFINED;
+    MPI_Comm_split(MPI_COMM_WORLD, is_rank0, 0, comm_btwn_nodes);
+}
+
+//------------------------ END OF GROUPING -------------------------------
+
 void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, int) ){
     /*
        Shares the work among different nodes, via statical load balancing
@@ -751,13 +768,37 @@ void print_diff_with_ref(pixel** p, int n_images, int width, int height, pixel**
     }
 }
 
-void hello_omp_mpi(){
-    int mpi_rank, mpi_size ;
-    MPI_Comm_rank( MPI_COMM_WORLD, &mpi_rank );
-    MPI_Comm_size( MPI_COMM_WORLD, &mpi_size ) ;
+void hello_omp_mpi(MPI_Comm comm_in_node, MPI_Comm comm_btwn_nodes){
+    int rank_in_world, size_in_world ;
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank_in_world );
+    MPI_Comm_size( MPI_COMM_WORLD, &size_in_world );
+    int rank_in_node, size_in_node ;
+    MPI_Comm_rank( comm_in_node, &rank_in_node );
+    MPI_Comm_size( comm_in_node, &size_in_node );
+    int rank_btwn_nodes, size_btwn_nodes ;
+    //only in this case the master communicator is defined
+    if(rank_in_node == 0){
+        MPI_Comm_rank( comm_btwn_nodes, &rank_btwn_nodes );
+        MPI_Comm_size( comm_btwn_nodes, &size_btwn_nodes );
+    }
+    else{
+        rank_btwn_nodes = -1;
+        size_btwn_nodes = -1;
+    }
 #pragma omp parallel
     {
-        printf("Hello MPI %d (%d) & OpenMP %d (%d)\n",mpi_rank, mpi_size,
+        printf("Hello MPI:"
+                "  world:"
+                " %d (%d)"
+                "  node"
+                " %d (%d)"
+                "  masters"
+                " %d (%d)"
+                "\t\tOpenMP:"
+                " %d (%d)\n" ,
+                rank_in_world, size_in_world,
+                rank_in_node, size_in_node,
+                rank_btwn_nodes, size_btwn_nodes,
                 omp_get_thread_num(),
                 omp_get_num_threads() ) ;
     }
@@ -782,7 +823,7 @@ bool is_constant_size_gif(animated_gif * image){
 
 //------------------------ END OF DEBUG TOOLS -------------------------------
 double time_passed(struct timeval t1, struct timeval t2){
-        return (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
+    return (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
 }
 
 int main( int argc, char ** argv )
@@ -807,6 +848,10 @@ int main( int argc, char ** argv )
     MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
     int n_images, height, width;
 
+    MPI_Comm comm_in_node;
+    set_MPI_comm_in_node(&comm_in_node);
+    MPI_Comm comm_btwn_nodes;
+    set_MPI_comm_btwn_node(comm_in_node, &comm_btwn_nodes);
     if(rank_in_world == root_in_world){
         if ( argc < 3 )
         {
@@ -817,14 +862,14 @@ int main( int argc, char ** argv )
         input_filename = argv[1] ;
         output_filename = argv[2] ;
 
-        /* IMPORT Timer start */
+        // IMPORT Timer start
         gettimeofday(&t1, NULL);
 
-        /* Load file and store the pixels in array */
+        // Load file and store the pixels in array
         image = load_pixels( input_filename ) ;
         if ( image == NULL ) { return 1 ; }
 
-        /* IMPORT Timer stop */
+        // IMPORT Timer stop
         gettimeofday(&t2, NULL);
 
         printf( "GIF loaded from file %s with %d image(s) in %lf s\n",
@@ -836,7 +881,7 @@ int main( int argc, char ** argv )
 
         printf( "GIF STATS: width = %d, height = %d, number of images = %d\n", image->height[0], image->width[0], image->n_images);
 
-        /* FILTER Timer start */
+        // FILTER Timer start
         gettimeofday(&t1, NULL);
     }
 
@@ -844,20 +889,15 @@ int main( int argc, char ** argv )
 
 
     if(rank_in_world == root_in_world){
-        int i;
-
-        /* FILTER Timer stop */
         gettimeofday(&t2, NULL);
 
         printf( "SOBEL done in %lf s\n", time_passed(t1, t2) ) ;
 
-        /* EXPORT Timer start */
         gettimeofday(&t1, NULL);
 
-        /* Store file from array of pixels to GIF file */
+        // Store file from array of pixels to GIF file
         if ( !store_pixels( output_filename, image ) ) { return 1 ; }
 
-        /* EXPORT Timer stop */
         gettimeofday(&t2, NULL);
 
         printf( "Export done in %lf s in file %s\n--------------------------------------\n", time_passed(t1, t2), output_filename ) ;
