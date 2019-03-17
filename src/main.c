@@ -604,7 +604,8 @@ void complete_filter_omp( pixel * p, int width, int height) {
 // To be completed
 void complete_filter_cuda( pixel * p, int width, int height) {
     gray_filter_cuda(p, width, height);
-    blur_filter_seq_with_defaults(p, width, height);
+    blur_filter_cuda(p, width, height, BLUR_SIZE, BLUR_THRESHOLD);
+    //blur_filter_seq_with_defaults(p, width, height);
     sobel_filter_omp(p, width, height);
 }
 
@@ -791,6 +792,7 @@ int main( int argc, char ** argv )
     struct timeval t1, t2;
     double duration ;
 
+
     int rc, rank_in_world, size_in_world;
     // Initializes MPI
     rc = MPI_Init(&argc, &argv);
@@ -805,6 +807,7 @@ int main( int argc, char ** argv )
     MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
     int n_images,height, width;
     pixel** p_original;
+    pixel** pr;
 
     if(rank_in_world == root_in_world){
         if ( argc < 3 )
@@ -822,6 +825,8 @@ int main( int argc, char ** argv )
         /* Load file and store the pixels in array */
         image = load_pixels( input_filename ) ;
         if ( image == NULL ) { return 1 ; }
+        
+        pr = reference_treated(image->p, image->n_images, image->width[0], image->height[0]);
 
         /* IMPORT Timer stop */
         gettimeofday(&t2, NULL);
@@ -841,14 +846,12 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-    if(image){
-        bulk_apply_cuda(image->p, image->width, image->height, image->n_images, gray_filter_cuda);
-    }
-
+    apply_to_all_MPI_stat(image, complete_filter_seq);
 
     if(rank_in_world == root_in_world){
         int i;
 
+        print_diff_with_ref(image->p, image->n_images, image->width[0], image->height[0], pr);
         /* FILTER Timer stop */
         gettimeofday(&t2, NULL);
 
@@ -868,9 +871,9 @@ int main( int argc, char ** argv )
         duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
 
         printf( "Export done in %lf s in file %s\n--------------------------------------\n", duration, output_filename ) ;
-
     }
 
+    
     MPI_Finalize();
     return 0 ;
 }
