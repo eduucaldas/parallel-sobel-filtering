@@ -26,6 +26,12 @@
 MPI_Datatype MPI_PIXEL;
 int root_in_world = 0;
 
+// Communicator inside a node
+MPI_Comm comm_in_node;
+
+// Communicator among masters of each nodes
+MPI_Comm comm_btwn_nodes;
+
 int eq_pixel(pixel a, pixel b){
     return (a.r == b.r) && (a.g == b.g) && (a.b == b.b);
 }
@@ -662,17 +668,17 @@ void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*,
 
 //------------------------ BEGIN OF GROUPING -------------------------------
 
-void set_MPI_comm_in_node(MPI_Comm * comm_in_node){
-    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, comm_in_node);
+void set_MPI_comm_in_node(){
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &comm_in_node);
 }
 
 
-void set_MPI_comm_btwn_node(MPI_Comm comm_in_node, MPI_Comm * comm_btwn_nodes){
+void set_MPI_comm_btwn_node(){
     int rank_in_node;
     MPI_Comm_rank(comm_in_node, &rank_in_node);
     int is_rank0, node_count;
     is_rank0 = (rank_in_node == 0) ? 1 : MPI_UNDEFINED;
-    MPI_Comm_split(MPI_COMM_WORLD, is_rank0, 0, comm_btwn_nodes);
+    MPI_Comm_split(MPI_COMM_WORLD, is_rank0, 0, &comm_btwn_nodes);
 }
 
 //------------------------ END OF GROUPING -------------------------------
@@ -768,7 +774,7 @@ void print_diff_with_ref(pixel** p, int n_images, int width, int height, pixel**
     }
 }
 
-void hello_omp_mpi(MPI_Comm comm_in_node, MPI_Comm comm_btwn_nodes){
+void hello_omp_mpi(){
     int rank_in_world, size_in_world ;
     MPI_Comm_rank( MPI_COMM_WORLD, &rank_in_world );
     MPI_Comm_size( MPI_COMM_WORLD, &size_in_world );
@@ -846,12 +852,12 @@ int main( int argc, char ** argv )
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
     MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
-    int n_images, height, width;
 
-    MPI_Comm comm_in_node;
-    set_MPI_comm_in_node(&comm_in_node);
-    MPI_Comm comm_btwn_nodes;
-    set_MPI_comm_btwn_node(comm_in_node, &comm_btwn_nodes);
+    set_MPI_comm_in_node();
+    set_MPI_comm_btwn_node();
+    hello_omp_mpi();
+
+    int n_images, height, width;
     if(rank_in_world == root_in_world){
         if ( argc < 3 )
         {
