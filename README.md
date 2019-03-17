@@ -26,7 +26,7 @@ TODO
 - [x] mix mpi with openmp
 - [ ] optimise: bulk\_MPI
 - [ ] adapt: bulk\_MPI to treat gifs with different height and width
-- [ ] implement: bulk\_openMP
+- [ ] implement: bulk\_OMP
 - [ ] implement: MPI by splitting image
 - [x] implement: OMP by splitting image
     + [x] gray\_filter
@@ -36,5 +36,10 @@ TODO
     + [x] gray\_filter
     + [ ] blur\_filter
     + [ ] sobel\_filter
+- [ ] implement: bulk images to treat on CUDA
+    + [x] gray\_filter
+    + [ ] blur\_filter
+    + [ ] sobel\_filter
 - [ ] benchmarking framework
+- [ ] load-balancing
 

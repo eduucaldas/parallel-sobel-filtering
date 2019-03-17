@@ -21,16 +21,17 @@ gray_kernel( pixel * p, int max){
     }
 }
 
-int grid_dim(int data_size, int block_dim){
-    return data_size/block_dim + 1;
+int grid_dim(int image_size, int block_dim){
+    return image_size/block_dim + 1;
 }
 
 void gray_filter_cuda(pixel* p, int width, int height)
 {
+    int size_image = width*height;
     pixel * d_p;
-    cudaMalloc((void **)&d_p, width * height * sizeof(pixel));
-    cudaMemcpy(d_p, p, width * height * sizeof(pixel), cudaMemcpyHostToDevice);
-    gray_kernel<<<grid_dim(width*height, BLOCK_DIM),BLOCK_DIM>>>(d_p, width * height);
+    cudaMalloc((void **)&d_p, size_image * sizeof(pixel));
+    cudaMemcpy(d_p, p, size_image * sizeof(pixel), cudaMemcpyHostToDevice);
+    gray_kernel<<<grid_dim(size_image, BLOCK_DIM),BLOCK_DIM>>>(d_p, size_image);
 
-    cudaMemcpy(p, d_p, width * height * sizeof(pixel), cudaMemcpyDeviceToHost);
+    cudaMemcpy(p, d_p, size_image * sizeof(pixel), cudaMemcpyDeviceToHost);
 }

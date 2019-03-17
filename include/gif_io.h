@@ -2,8 +2,6 @@
 #define GIF_IO_H
 #include <gif_lib.h>
 
-#define SOBELF_DEBUG 0
-
 /* Represent one pixel from the image */
 typedef struct pixel
 {

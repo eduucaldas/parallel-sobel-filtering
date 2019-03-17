@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
+#include <string.h>
 
 #include <gif_io.h>
 #include <omp.h>
@@ -608,7 +609,7 @@ void complete_filter_cuda( pixel * p, int width, int height) {
 }
 
 // apply filter to sequence of Images ----------------------------
-void bulk_apply_seq( pixel **images, int *widths, int *heights, int n_images, void (*filter)(pixel*, int, int)){
+void bulk_apply_seq( pixel ** images, int * widths, int * heights, int n_images, void (*filter)(pixel*, int, int)){
     int i;
     for ( i = 0 ; i < n_images ; i++ )
     {
@@ -617,7 +618,7 @@ void bulk_apply_seq( pixel **images, int *widths, int *heights, int n_images, vo
 }
 
 // Needs testing
-void bulk_apply_omp( pixel **images, int *widths, int *heights, int n_images, void (*filter)(pixel*, int, int)){
+void bulk_apply_omp( pixel ** images, int * widths, int * heights, int n_images, void (*filter)(pixel*, int, int)){
     int i;
 #pragma omp for schedule(static)
     for ( i = 0 ; i < n_images ; i++ )
@@ -626,10 +627,36 @@ void bulk_apply_omp( pixel **images, int *widths, int *heights, int n_images, vo
     }
 }
 
+void bulk_apply_cuda( pixel ** images, int * widths, int * heights, int n_images, void (*filter)(pixel*, int, int)){
+     pixel* lin_images;
+     int i;
+     int n_pixels;
+     n_pixels = 0;
+     for( i = 0; i < n_images; i++){
+        n_pixels += widths[i] * heights[i];
+     }
+     lin_images = (pixel*)malloc(n_pixels * sizeof(pixel));
+
+     n_pixels = 0;
+     for( i = 0; i < n_images; i++){
+        memcpy(lin_images + n_pixels, images[i], widths[i] * heights[i] * sizeof(pixel));
+        n_pixels += widths[i] * heights[i];
+     }
+
+     (*filter)(lin_images, n_pixels, 1);// cheating
+
+     n_pixels = 0;
+     for( i = 0; i < n_images; i++){
+        memcpy(images[i], lin_images + n_pixels, widths[i] * heights[i] * sizeof(pixel));
+        n_pixels += widths[i] * heights[i];
+     }
+}
+
 // Applying filters to all images of Gif
 void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*, int, void (*f)(pixel*, int, int)), void (*filter)(pixel*, int, int) )
 {
-    (*bulk_apply)(image->p, image->width, image->height, image->n_images, (*filter));
+    if(image)
+        (*bulk_apply)(image->p, image->width, image->height, image->n_images, (*filter));
 }
 
 //------------------------ BEGIN OF MPI -------------------------------
@@ -814,7 +841,10 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-    apply_to_all_MPI_stat(image, complete_filter_omp);
+    if(image){
+        bulk_apply_cuda(image->p, image->width, image->height, image->n_images, gray_filter_cuda);
+    }
+
 
     if(rank_in_world == root_in_world){
         int i;
