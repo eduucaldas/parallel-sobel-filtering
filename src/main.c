@@ -34,7 +34,6 @@ int black_pixel(pixel a){
     if((a.r == 255) && (a.g == 255) && (a.b == 255)) return 1;
     else if((a.r == 0) && (a.g == 0) && (a.b == 0)) return 0;
     else return 999999;
-
 }
 
 //------------------------ BEGIN OF FILTERS -------------------------------
@@ -94,7 +93,7 @@ void gray_filter_mpi(pixel* p, int width, int height){
     int n_slaves = size_in_world - 1;
     int chunk_size = (width * height) / n_slaves;
     int s_id, p_size, p_start;
-    
+
     if(rank_in_world == root_in_world) {
         for(s_id = 1; s_id < size_in_world; s_id++) {
             p_size = chunk_size + (s_id <= (width * height) % n_slaves ? 1 : 0);
@@ -126,7 +125,7 @@ void gray_filter_mpi(pixel* p, int width, int height){
         p_local = malloc(p_size * sizeof(pixel));
 
         MPI_Recv(p_local, p_size, MPI_PIXEL, root_in_world, rank_in_world, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        
+
         for (j = 0; j < width * height ; j++ )
         {
             int moy ;
@@ -782,6 +781,9 @@ bool is_constant_size_gif(animated_gif * image){
 }
 
 //------------------------ END OF DEBUG TOOLS -------------------------------
+double time_passed(struct timeval t1, struct timeval t2){
+        return (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
+}
 
 int main( int argc, char ** argv )
 {
@@ -803,8 +805,7 @@ int main( int argc, char ** argv )
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
     MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
-    int n_images,height, width;
-    pixel** p_original;
+    int n_images, height, width;
 
     if(rank_in_world == root_in_world){
         if ( argc < 3 )
@@ -826,10 +827,8 @@ int main( int argc, char ** argv )
         /* IMPORT Timer stop */
         gettimeofday(&t2, NULL);
 
-        duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
         printf( "GIF loaded from file %s with %d image(s) in %lf s\n",
-                input_filename, image->n_images, duration ) ;
+                input_filename, image->n_images, time_passed(t1, t2) ) ;
         if(!is_constant_size_gif(image)){
             MPI_Finalize();
             return 1;
@@ -841,9 +840,7 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-    if(image){
         bulk_apply_cuda(image->p, image->width, image->height, image->n_images, gray_filter_cuda);
-    }
 
 
     if(rank_in_world == root_in_world){
@@ -852,9 +849,7 @@ int main( int argc, char ** argv )
         /* FILTER Timer stop */
         gettimeofday(&t2, NULL);
 
-        duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-        printf( "SOBEL done in %lf s\n", duration ) ;
+        printf( "SOBEL done in %lf s\n", time_passed(t1, t2) ) ;
 
         /* EXPORT Timer start */
         gettimeofday(&t1, NULL);
@@ -865,9 +860,7 @@ int main( int argc, char ** argv )
         /* EXPORT Timer stop */
         gettimeofday(&t2, NULL);
 
-        duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-        printf( "Export done in %lf s in file %s\n--------------------------------------\n", duration, output_filename ) ;
+        printf( "Export done in %lf s in file %s\n--------------------------------------\n", time_passed(t1, t2), output_filename ) ;
 
     }
 
