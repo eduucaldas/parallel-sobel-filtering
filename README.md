@@ -24,22 +24,27 @@ TODO
 ## TODO
 - [x] Separate files, main is too big
 - [x] mix mpi with openmp
-- [ ] optimise: bulk\_MPI
-- [ ] adapt: bulk\_MPI to treat gifs with different height and width
-- [ ] implement: bulk\_OMP
-- [ ] implement: MPI by splitting image
 - [x] implement: OMP by splitting image
     + [x] gray\_filter
     + [x] blur\_filter
     + [x] sobel\_filter
-- [ ] implement: CUDA by splitting image
+- [x] implement: CUDA by splitting image
     + [x] gray\_filter
-    + [ ] blur\_filter
-    + [ ] sobel\_filter
+    + [x] blur\_filter
+    + [x] sobel\_filter
+- [x] adapt: bulk\_MPI to treat gifs with different height and width
+- [x] optimise: bulk\_MPI, send many images and then treat them with some other bulk
+- [ ] implement: bulk\_MPI to use slaves without gpu
+- [ ] implement: MPI by splitting image
+- [ ] implement: bulk\_OMP
+- [ ] optimise: OMP, use dynamic instead of static
 - [ ] implement: bulk images to treat on CUDA
     + [x] gray\_filter
     + [ ] blur\_filter
     + [ ] sobel\_filter
 - [ ] benchmarking framework
+    + [ ] stats of the run: MPI\_nodes, MPI\_tasks, OMP\threads, input stats
+    + [ ] fprint the stats
+    + [ ] command-line arguments regarding hardware
 - [ ] load-balancing
 
