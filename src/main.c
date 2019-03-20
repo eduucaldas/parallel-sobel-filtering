@@ -3,7 +3,6 @@
  *
  * Image Filtering Project
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -25,7 +24,6 @@
 
 MPI_Datatype MPI_PIXEL;
 int root_in_world = 0;
-
 // Communicator inside a node
 MPI_Comm comm_in_node;
 
@@ -323,7 +321,6 @@ void blur_filter_omp(pixel * p, int width, int height, int size, int threshold){
                 }
             }
 
-            int j_end = height*0.9+size;
 
             /* Apply blur on the bottom part of the image (10%) */
 #pragma omp for schedule(static)
@@ -657,11 +654,11 @@ void bulk_apply_cuda( pixel ** images, int * widths, int * heights, int n_images
      }
 }
 
-// Applying filters to all images of Gif
+// Applying filters to all images of Gif FIXME
 void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*, int, void (*f)(pixel*, int, int)), void (*filter)(pixel*, int, int) )
 {
     if(image)
-        (*bulk_apply)(image->p, image->width, image->height, image->n_images, (*filter));
+       (*bulk_apply)(image->p, image->width, image->height, image->n_images, (*filter));
 }
 
 //------------------------ BEGIN OF MPI -------------------------------
@@ -767,7 +764,9 @@ void print_diff_with_ref(pixel** p, int n_images, int width, int height, pixel**
             for(x = 0; x < width; x++){
                 j = CONV(y, x, width);
                 if(!eq_pixel(p[i][j], p_ref[i][j])){
-                    printf("diff on img %3d in pixel (%3d,%3d): p_std = %d and p_new = %d\n", i, x, y, black_pixel(p_ref[i][j]), black_pixel(p[i][j]));
+                    printf("diff on img %3d in pixel (%3d,%3d): "
+                            "p_std = %d and p_new = %d\n", i, x, y,
+                            black_pixel(p_ref[i][j]), black_pixel(p[i][j]));
                 }
             }
         }
@@ -818,9 +817,10 @@ bool is_constant_size_gif(animated_gif * image){
 
     int i;
     for(i = 0; i < n_images; i++){
-        int j;
         if(height != image->height[i] || width != image->width[i]){
-            printf("WOW: your gif has varying dimensions\nfst image: (%d, %d)\nsnd image: (%d, %d)\n", width, height, image->width[i], image->height[i]);
+            printf("WOW: your gif has varying dimensions\n"
+                    "fst image: (%d, %d)\nsnd image: (%d, %d)\n",
+                    width, height, image->width[i], image->height[i]);
             return false;
         }
     }
@@ -838,7 +838,6 @@ int main( int argc, char ** argv )
     char * output_filename ;
     animated_gif * image ;
     struct timeval t1, t2;
-    double duration ;
 
     int rc, rank_in_world, size_in_world;
     // Initializes MPI
@@ -857,10 +856,8 @@ int main( int argc, char ** argv )
     set_MPI_comm_btwn_node();
     hello_omp_mpi();
 
-    int n_images, height, width;
     if(rank_in_world == root_in_world){
-        if ( argc < 3 )
-        {
+        if ( argc < 3 ) {
             fprintf( stderr, "Usage: %s input.gif output.gif \n", argv[0] ) ;
             return 1 ;
         }
@@ -885,7 +882,8 @@ int main( int argc, char ** argv )
             return 1;
         }
 
-        printf( "GIF STATS: width = %d, height = %d, number of images = %d\n", image->height[0], image->width[0], image->n_images);
+        printf( "GIF STATS: width = %d, height = %d, number of images = %d\n",
+                image->height[0], image->width[0], image->n_images);
 
         // FILTER Timer start
         gettimeofday(&t1, NULL);
@@ -906,8 +904,9 @@ int main( int argc, char ** argv )
 
         gettimeofday(&t2, NULL);
 
-        printf( "Export done in %lf s in file %s\n--------------------------------------\n", time_passed(t1, t2), output_filename ) ;
-
+        printf( "Export done in %lf s in file %s\n"
+                "--------------------------------------\n",
+                time_passed(t1, t2), output_filename ) ;
     }
 
     MPI_Finalize();
