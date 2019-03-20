@@ -683,79 +683,129 @@ void apply_to_all( animated_gif * image, void (*bulk_apply)(pixel**, int*, int*,
 //------------------------ BEGIN OF GROUPING -------------------------------
 
 void set_MPI_comm_in_node(){
-    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &comm_in_node);
+    int rank_in_world;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED,
+            rank_in_world, MPI_INFO_NULL, &comm_in_node);
 }
 
-
 void set_MPI_comm_btwn_node(){
-    int rank_in_node;
+    int rank_in_node, rank_in_world;
     MPI_Comm_rank(comm_in_node, &rank_in_node);
-    int is_rank0, node_count;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
+    int is_rank0;
     is_rank0 = (rank_in_node == 0) ? 1 : MPI_UNDEFINED;
-    MPI_Comm_split(MPI_COMM_WORLD, is_rank0, 0, &comm_btwn_nodes);
+    MPI_Comm_split(MPI_COMM_WORLD, is_rank0, rank_in_world, &comm_btwn_nodes);
 }
 
 //------------------------ END OF GROUPING -------------------------------
+void apply_MPI_btwn(animated_gif * image, void (*filter)(pixel *, int, int)){
+    int rank_in_node;
+    MPI_Comm_rank(comm_in_node, &rank_in_node);
+    if(rank_in_node != 0) return; // to be implemented after
 
-void apply_to_all_MPI_stat( animated_gif * image, void (*filter)(pixel *, int, int) ){
-    /*
-       Shares the work among different nodes, via statical load balancing
-       Master sends equal packages of work to all slave nodes and then performs the rest of the work himself
-       Uses Isend and Irecv with waitall barrier afterwards
-       */
-    int l_id, g_id, s_id; // local_gif_id, global_gif_id, slave_id
-    int rank_in_world, size_in_world;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank_in_world);
-    MPI_Comm_size(MPI_COMM_WORLD, &size_in_world);
+    // Little notation _r suffix stands for in_rank
+    // Basic information
+    int rank_btwn_nodes, size_btwn_nodes;
+    MPI_Comm_rank(comm_btwn_nodes, &rank_btwn_nodes);
+    MPI_Comm_size(comm_btwn_nodes, &size_btwn_nodes);
 
-    if(size_in_world == 1) return apply_to_all(image, bulk_apply_seq, (*filter));
-    // From here on size_in_world > 1, and we use pure master slave architecture
-    int n_slaves = size_in_world - 1;
-
-    int height;
-    int width;
-    int n_images_global;
-    if(rank_in_world == root_in_world) {
-        n_images_global = image->n_images;
-        width  = image->width[0];
-        height = image->height[0];
+    int n_images_g;
+    int * width, *height;
+    pixel** p;
+    if(rank_btwn_nodes == 0){
+        n_images_g = image->n_images;
+        width = image->width;
+        height = image->height;
+        p = image->p;
     }
 
-    MPI_Bcast(&n_images_global, 1, MPI_INT, root_in_world, MPI_COMM_WORLD);
-    MPI_Bcast(&width, 1, MPI_INT, root_in_world, MPI_COMM_WORLD);
-    MPI_Bcast(&height, 1, MPI_INT, root_in_world, MPI_COMM_WORLD);
+    MPI_Bcast(&n_images_g, 1, MPI_INT, 0, comm_btwn_nodes);
+    // -----------------
 
-    // load_balancing: we share work in a bulk manner, not round-robin
-    int* n_images_rank = malloc(size_in_world * sizeof(int));
-    n_images_rank[root_in_world] = 0;
-    for(s_id = 1; s_id < size_in_world; s_id++){
-        n_images_rank[s_id] = n_images_global / n_slaves + (s_id <= (n_images_global % n_slaves));
-    }// uses the fact that root_in_world = 0
+    // split work, setting up parameters for scatterv
+    int base_size = n_images_g / size_btwn_nodes;
+    int remain_size = n_images_g % size_btwn_nodes;
 
-    pixel * gif_local;
-
-    int j;
-    if(rank_in_world == root_in_world){
-        g_id = 0;
-        for(s_id = 1; s_id < size_in_world; s_id++){
-            for(l_id = 0; l_id < n_images_rank[s_id]; l_id++, g_id++){
-                MPI_Send(image->p[g_id], height * width, MPI_PIXEL, s_id, l_id, MPI_COMM_WORLD);
-                MPI_Recv(image->p[g_id], height * width, MPI_PIXEL, s_id, l_id, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            }
+    int i, j, acc; // aux variables
+    int *n_images_to_r, *n_images_until_r;
+    if(rank_btwn_nodes == 0){
+        n_images_to_r = (int*)malloc(size_btwn_nodes * sizeof(int));
+        n_images_until_r = (int*)malloc(size_btwn_nodes * sizeof(int));
+        acc = 0;
+        for(i = 0; i < size_btwn_nodes; i++){
+            n_images_until_r[i] = acc;
+            n_images_to_r[i] = base_size + (i < remain_size);
+            acc += n_images_to_r[i];
         }
-    } else{
-        int n_images_local = n_images_rank[rank_in_world];
-        gif_local = malloc(height * width * sizeof(pixel));
-        for(l_id = 0; l_id < n_images_local; l_id++){
-            MPI_Recv(gif_local, height * width, MPI_PIXEL, root_in_world, l_id, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            (*filter)(gif_local, width, height);
-            MPI_Send(gif_local, height * width, MPI_PIXEL, root_in_world, l_id, MPI_COMM_WORLD);
-        }
-        free(gif_local);
     }
+
+    int n_images_r;
+    n_images_r = base_size + (rank_btwn_nodes < remain_size);
+    // ----------------------------------------------
+
+    // Scatter width and height, important for images with varying sizes
+    int *width_r, *height_r;
+    width_r = (int*)malloc(n_images_r * sizeof(int));
+    height_r = (int*)malloc(n_images_r * sizeof(int));
+    MPI_Scatterv(width, n_images_to_r, n_images_until_r, MPI_INT,
+            width_r, n_images_r, MPI_INT,
+            0, comm_btwn_nodes);
+    MPI_Scatterv(height, n_images_to_r, n_images_until_r, MPI_INT,
+            height_r, n_images_r, MPI_INT,
+            0, comm_btwn_nodes);
+    // ----------------------------------------------------------------
+
+    // Set up parameters for scatter
+    int *n_pixels_to_r, *n_pixels_until_r;
+    if(rank_btwn_nodes == 0){
+        n_pixels_to_r = (int*)malloc(size_btwn_nodes * sizeof(int));
+        n_pixels_until_r = (int*)malloc(size_btwn_nodes * sizeof(int));
+
+        // Set up parameters for Scatterv
+        acc = 0;
+        for( i = 0; i < size_btwn_nodes; i++){
+            n_pixels_until_r[i] = acc;
+            n_pixels_to_r[i] = count_pixels(
+                    width  + n_images_until_r[i],
+                    height + n_images_until_r[i],
+                    n_images_to_r[i]);
+            acc += n_pixels_to_r[i];
+        }
+    }
+    // ----------------------------------
+
+    // Linearize Images
+    pixel* lin_p;
+    if(rank_btwn_nodes == 0)
+        lin_p = linearize_gif(p, width, height, n_images_g);
+
+
+    int n_pixels_r = count_pixels(width_r, height_r, n_images_r);
+    pixel* lin_p_r;
+    lin_p_r = (pixel*)malloc(n_pixels_r * sizeof(pixel));
+    // ---------------
+
+    MPI_Scatterv(lin_p, n_pixels_to_r, n_pixels_until_r, MPI_PIXEL,
+            lin_p_r, n_pixels_r, MPI_PIXEL,
+            0, comm_btwn_nodes);
+
+    // Unlinearize images
+    pixel ** p_r;
+    p_r = unlinearize_gif(lin_p_r, width_r, height_r, n_images_r);
+
+    // Filter the images, TODO: change to make function general
+    bulk_apply_seq(p_r, width_r, height_r, n_images_r, (*filter));
+    // Ps.: as p_r is just pointers to the actual block of linearized gif this will also change the lin_p_r
+
+    // Gather back linearized images in root
+    MPI_Gatherv(lin_p_r, n_pixels_r, MPI_PIXEL,
+            lin_p, n_pixels_to_r, n_pixels_until_r, MPI_PIXEL,
+            0, comm_btwn_nodes);
 }
 
 //------------------------ END OF MPI -------------------------------
+
 //------------------------ BEGIN OF DEBUG TOOLS -------------------------------
 
 pixel** reference_treated(pixel** p, int n_images, int width, int height){
@@ -895,8 +945,7 @@ int main( int argc, char ** argv )
         printf( "GIF loaded from file %s with %d image(s) in %lf s\n",
                 input_filename, image->n_images, time_passed(t1, t2) ) ;
         if(!is_constant_size_gif(image)){
-            MPI_Finalize();
-            return 1;
+            printf( "\nDon`t worry, we can handle that!\n");
         }
 
         printf( "GIF STATS: width = %d, height = %d, number of images = %d\n",
@@ -906,9 +955,7 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-        bulk_apply_cuda(image->p, image->width, image->height, image->n_images, gray_filter_cuda);
-
-
+    apply_MPI_btwn(image, complete_filter_cuda)
     if(rank_in_world == root_in_world){
         gettimeofday(&t2, NULL);
 
