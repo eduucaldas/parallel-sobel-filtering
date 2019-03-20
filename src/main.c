@@ -21,7 +21,9 @@
 // Configuration Variables
 #define BLUR_SIZE 5
 #define BLUR_THRESHOLD 20
+#define LOG_FILE "log.txt"
 
+FILE *bench;
 MPI_Datatype MPI_PIXEL;
 int root_in_world = 0;
 // Communicator inside a node
@@ -840,6 +842,16 @@ void print_diff_with_ref(pixel** p, int n_images, int width, int height, pixel**
     }
 }
 
+void hello_quiet(){
+    int size_in_world, rank_in_world ;
+    MPI_Comm_size( MPI_COMM_WORLD, &size_in_world );
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank_in_world );
+    if(rank_in_world != 0)return;
+    int size_btwn_nodes ;
+    MPI_Comm_size( comm_btwn_nodes, &size_btwn_nodes );
+    fprintf(bench, "#N: %d; #n: %d; #t: %d ", size_in_world, size_btwn_nodes, omp_get_num_threads() );
+}
+
 void hello_omp_mpi(){
     int rank_in_world, size_in_world ;
     MPI_Comm_rank( MPI_COMM_WORLD, &rank_in_world );
@@ -929,17 +941,20 @@ int main( int argc, char ** argv )
             fprintf( stderr, "Usage: %s input.gif output.gif \n", argv[0] ) ;
             return 1 ;
         }
-
         input_filename = argv[1] ;
         output_filename = argv[2] ;
 
+        bench = fopen(LOG_FILE, "a");
+        hello_quiet(bench);
         // IMPORT Timer start
         gettimeofday(&t1, NULL);
 
         // Load file and store the pixels in array
         image = load_pixels( input_filename ) ;
         if ( image == NULL ) { return 1 ; }
-
+        fprintf(bench, "n: %d; w: %d; h: %d; np: %d; ",
+                image->n_images, image->width[0], image->height[0],
+                count_pixels(image->width, image->height, image->n_images));
         // IMPORT Timer stop
         gettimeofday(&t2, NULL);
 
@@ -961,7 +976,8 @@ int main( int argc, char ** argv )
         gettimeofday(&t2, NULL);
 
         printf( "SOBEL done in %lf s\n", time_passed(t1, t2) ) ;
-
+        fprintf( bench, "t(s): %.5lf \n", time_passed(t1, t2));
+        fclose(bench);
         gettimeofday(&t1, NULL);
 
         // Store file from array of pixels to GIF file
