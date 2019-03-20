@@ -629,29 +629,46 @@ void bulk_apply_omp( pixel ** images, int * widths, int * heights, int n_images,
     }
 }
 
-void bulk_apply_cuda( pixel ** images, int * widths, int * heights, int n_images, void (*filter)(pixel*, int, int)){
-     pixel* lin_images;
-     int i;
-     int n_pixels;
-     n_pixels = 0;
-     for( i = 0; i < n_images; i++){
-        n_pixels += widths[i] * heights[i];
-     }
-     lin_images = (pixel*)malloc(n_pixels * sizeof(pixel));
+int count_pixels(int * width, int * height, int n_images){
+    int n_pixels, i;
+    n_pixels = 0;
+    for( i = 0; i < n_images; i++){
+        n_pixels += width[i] * height[i];
+    }
+    return n_pixels;
+}
 
-     n_pixels = 0;
-     for( i = 0; i < n_images; i++){
-        memcpy(lin_images + n_pixels, images[i], widths[i] * heights[i] * sizeof(pixel));
-        n_pixels += widths[i] * heights[i];
-     }
+pixel* linearize_gif(pixel** p, int * width, int * height, int n_images){
+    pixel* lin_p;
+    lin_p = (pixel*)malloc(count_pixels(width, height, n_images) * sizeof(pixel));
+    int n_pixels = 0, i;
+    for( i = 0; i < n_images; i++){
+        memcpy(lin_p + n_pixels, p[i], width[i] * height[i] * sizeof(pixel));
+        free(p[i]);
+        p[i] = lin_p + n_pixels;
+        n_pixels += width[i] * height[i];
+    }
+    return lin_p;
+}
 
-     (*filter)(lin_images, n_pixels, 1);// cheating
+pixel** unlinearize_gif(pixel* lin_p, int * width, int * height, int n_images){
+    pixel** p;
+    int n_pixels, i;
+    n_pixels = 0;
+    p = (pixel**)malloc(n_images * sizeof(pixel*));
+    for( i = 0; i < n_images; i++){
+        p[i] = lin_p + n_pixels;
+        n_pixels += width[i] * height[i];
+    }
+    return p;
+}
 
-     n_pixels = 0;
-     for( i = 0; i < n_images; i++){
-        memcpy(images[i], lin_images + n_pixels, widths[i] * heights[i] * sizeof(pixel));
-        n_pixels += widths[i] * heights[i];
-     }
+// Should not use it with anything other than gray filter
+void bulk_apply_cuda( pixel ** images, int * widths, int * heights, int n_images,
+        void (*filter)(pixel*, int, int)){
+    pixel* lin_images;
+    lin_images = linearize_gif(images, widths, heights, n_images);
+    (*filter)(lin_images, count_pixels(widths, heights, n_images), 1);// cheating
 }
 
 // Applying filters to all images of Gif FIXME
