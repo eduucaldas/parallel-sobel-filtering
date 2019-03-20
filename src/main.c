@@ -606,8 +606,8 @@ void complete_filter_omp( pixel * p, int width, int height) {
 // To be completed
 void complete_filter_cuda( pixel * p, int width, int height) {
     gray_filter_cuda(p, width, height);
-    blur_filter_seq_with_defaults(p, width, height);
-    sobel_filter_omp(p, width, height);
+    blur_filter_cuda(p, width, height, BLUR_SIZE, BLUR_THRESHOLD);
+    sobel_filter_cuda(p, width, height);
 }
 
 // apply filter to sequence of Images ----------------------------
@@ -906,6 +906,7 @@ int main( int argc, char ** argv )
     animated_gif * image ;
     struct timeval t1, t2;
 
+
     int rc, rank_in_world, size_in_world;
     // Initializes MPI
     rc = MPI_Init(&argc, &argv);
@@ -955,7 +956,7 @@ int main( int argc, char ** argv )
         gettimeofday(&t1, NULL);
     }
 
-    apply_MPI_btwn(image, complete_filter_cuda)
+    apply_MPI_btwn(image, complete_filter_cuda);
     if(rank_in_world == root_in_world){
         gettimeofday(&t2, NULL);
 
@@ -972,6 +973,7 @@ int main( int argc, char ** argv )
                 "--------------------------------------\n",
                 time_passed(t1, t2), output_filename ) ;
     }
+
 
     MPI_Finalize();
     return 0 ;
