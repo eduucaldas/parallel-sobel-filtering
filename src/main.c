@@ -428,6 +428,73 @@ void sobel_on_pixel(pixel *p, pixel *sobel, int j, int k, int width, int totalWi
     }
 }
 
+void sobel_filter_omp(pixel* p, int width, int height){
+    pixel * sobel ;
+
+    sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
+#pragma omp parallel
+{
+    int j, k;
+
+#pragma omp for schedule(static)
+    for(j=1; j<height-1; j++)
+    {
+        for(k=1; k<width-1; k++)
+        {
+            int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
+            int pixel_blue_so, pixel_blue_s, pixel_blue_se;
+            int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+
+            float deltaX_blue ;
+            float deltaY_blue ;
+            float val_blue;
+
+            pixel_blue_no = p[CONV(j-1,k-1,width)].b ;
+            pixel_blue_n  = p[CONV(j-1,k  ,width)].b ;
+            pixel_blue_ne = p[CONV(j-1,k+1,width)].b ;
+            pixel_blue_so = p[CONV(j+1,k-1,width)].b ;
+            pixel_blue_s  = p[CONV(j+1,k  ,width)].b ;
+            pixel_blue_se = p[CONV(j+1,k+1,width)].b ;
+            pixel_blue_o  = p[CONV(j  ,k-1,width)].b ;
+            pixel_blue    = p[CONV(j  ,k  ,width)].b ;
+            pixel_blue_e  = p[CONV(j  ,k+1,width)].b ;
+
+            deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;
+
+            deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
+
+            val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
+
+
+            if ( val_blue > 50 )
+            {
+                sobel[CONV(j  ,k  ,width)].r = 255 ;
+                sobel[CONV(j  ,k  ,width)].g = 255 ;
+                sobel[CONV(j  ,k  ,width)].b = 255 ;
+            } else
+            {
+                sobel[CONV(j  ,k  ,width)].r = 0 ;
+                sobel[CONV(j  ,k  ,width)].g = 0 ;
+                sobel[CONV(j  ,k  ,width)].b = 0 ;
+            }
+        }
+    }
+
+#pragma omp for schedule(static)
+    for(j=1; j<height-1; j++)
+    {
+        for(k=1; k<width-1; k++)
+        {
+            p[CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
+            p[CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
+            p[CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+        }
+    }
+}
+    free (sobel) ;
+
+}
+
 void sobel_filter_seq(pixel* p, int width, int height){
     pixel * sobel ;
 
@@ -517,7 +584,7 @@ void sobel_filter_mini(pixel* p, int width, int height, int totalWidth){
 
 }
 
-void sobel_filter_omp(pixel* p, int width, int height) {
+void sobel_filter_omp_grid(pixel* p, int width, int height) {
     int m = height / 10, n = width / 10;
 
     pixel * sobel;
